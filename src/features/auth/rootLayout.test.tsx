@@ -1,12 +1,14 @@
 import { act, render, screen } from '@testing-library/react-native';
-import { Platform } from 'react-native';
+import { Appearance, Platform } from 'react-native';
 
 // The root layout is an expo-router route, so this test lives under src/: any *.test.* file
 // inside app/ is picked up by Metro's require.context and bundled into the native app.
 import RootLayout from '../../../app/_layout';
 import { bindAuthAutoRefresh } from '../../services/supabase/autoRefresh';
 import { supabase } from '../../services/supabase/client';
+import { brandFonts } from '../../theme/fonts';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
 
 // The layout must not touch the router at all: it uses declarative route guards. The expo-router
 // mock therefore exports NO useRouter/useSegments/router — if the imperative redirect-in-effect
@@ -31,7 +33,20 @@ jest.mock('expo-router', () => {
   };
   return { Stack };
 });
-jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
+jest.mock('expo-status-bar', () => ({
+  StatusBar: ({ style }: { style: string }) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { View } = require('react-native');
+    return <View testID={`status-bar-${style}`} />;
+  },
+}));
+jest.mock('expo-font', () => ({ useFonts: jest.fn(() => [true, null]) }));
+// The root layout mounts <ThemeProvider>: keep its two side effects out of the test.
+jest.mock('nativewind', () => ({ colorScheme: { set: jest.fn() } }));
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(() => Promise.resolve(null)),
+  setItem: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('expo-splash-screen', () => ({
   preventAutoHideAsync: jest.fn(() => Promise.resolve()),
   hideAsync: jest.fn(() => Promise.resolve()),
@@ -46,6 +61,7 @@ const getSession = supabase.auth.getSession as jest.Mock;
 const onAuthStateChange = supabase.auth.onAuthStateChange as jest.Mock;
 const hideAsync = SplashScreen.hideAsync as jest.Mock;
 const bind = bindAuthAutoRefresh as jest.Mock;
+const useFontsMock = useFonts as jest.Mock;
 const unsubscribe = jest.fn();
 const originalOS = Platform.OS;
 
@@ -58,6 +74,7 @@ beforeEach(() => {
   jest.useFakeTimers();
   mockGuards.length = 0;
   setOS('ios');
+  useFontsMock.mockReturnValue([true, null]);
   onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe } } });
 });
 
@@ -169,6 +186,83 @@ describe('RootLayout session gate', () => {
     await screen.findByTestId('stack');
     await view.unmount();
     expect(unsubscribe).toHaveBeenCalled();
+  });
+});
+
+describe('RootLayout font gate', () => {
+  it('loads exactly the six brand weights', async () => {
+    getSession.mockResolvedValue({ data: { session: null } });
+    await render(<RootLayout />);
+    expect(useFontsMock).toHaveBeenCalledWith(brandFonts);
+    expect(Object.keys(brandFonts)).toEqual([
+      'Manrope_700Bold',
+      'Manrope_800ExtraBold',
+      'Inter_400Regular',
+      'Inter_500Medium',
+      'Inter_600SemiBold',
+      'Inter_700Bold',
+    ]);
+  });
+
+  it('keeps the splash up while the fonts are still loading, then drops it', async () => {
+    useFontsMock.mockReturnValue([false, null]);
+    getSession.mockResolvedValue({ data: { session: null } });
+    await render(<RootLayout />);
+    // The tree is mounted behind the splash, but the splash stays up.
+    expect(await screen.findByTestId('stack')).toBeTruthy();
+    expect(hideAsync).not.toHaveBeenCalled();
+
+    useFontsMock.mockReturnValue([true, null]);
+    const listener = onAuthStateChange.mock.calls[0][0];
+    await act(async () => {
+      listener('SIGNED_IN', SESSION);
+    });
+    expect(hideAsync).toHaveBeenCalled();
+  });
+
+  it('falls through to system fonts after the 4s timeout instead of holding the splash', async () => {
+    useFontsMock.mockReturnValue([false, null]);
+    getSession.mockResolvedValue({ data: { session: null } });
+    await render(<RootLayout />);
+    expect(hideAsync).not.toHaveBeenCalled();
+    await act(async () => {
+      jest.advanceTimersByTime(4100);
+    });
+    expect(hideAsync).toHaveBeenCalled();
+  });
+
+  it('never lets a font failure hold the splash', async () => {
+    useFontsMock.mockReturnValue([false, new Error('font download failed')]);
+    getSession.mockResolvedValue({ data: { session: null } });
+    await render(<RootLayout />);
+    expect(hideAsync).toHaveBeenCalled();
+    expect(await screen.findByTestId('stack')).toBeTruthy();
+  });
+});
+
+describe('RootLayout status bar', () => {
+  // The Appearance spy below must not leak into the rest of the file.
+  afterEach(() => jest.restoreAllMocks());
+
+  it('uses dark status bar content under the light theme', async () => {
+    getSession.mockResolvedValue({ data: { session: null } });
+    await render(<RootLayout />);
+    expect(screen.getByTestId('status-bar-dark')).toBeTruthy();
+  });
+
+  /*
+   * Regression: the style followed the RESOLVED THEME, so with the OS in night
+   * mode it switched to white glyphs — over screens that still paint the
+   * hard-coded white legacy page. The measured top band of the Android home
+   * screen was 100% (255,255,255): the clock, wifi and battery disappeared.
+   * The style follows what the SCREEN paints (src/theme/chrome.ts) instead.
+   */
+  it('keeps dark status bar content when the OS is in dark mode', async () => {
+    jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('dark');
+    getSession.mockResolvedValue({ data: { session: null } });
+    await render(<RootLayout />);
+    expect(screen.getByTestId('status-bar-dark')).toBeTruthy();
+    expect(screen.queryByTestId('status-bar-light')).toBeNull();
   });
 });
 

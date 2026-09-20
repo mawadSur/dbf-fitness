@@ -1,8 +1,9 @@
 import { Tabs } from 'expo-router';
+import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import type { ColorValue } from 'react-native';
 
+import { AppTabBar } from '../../src/components/navigation/TabBar';
 import { TabIcon, type TabIconName } from '../../src/components/navigation/tabIcons';
-import { colors } from '../../src/theme/tokens';
 
 function icon(name: TabIconName) {
   const render = ({ color, size }: { color: ColorValue; size: number }) => (
@@ -12,16 +13,22 @@ function icon(name: TabIconName) {
   return render;
 }
 
+/** One renderer instance, so switching tabs does not remount the bar. */
+function renderTabBar(props: BottomTabBarProps) {
+  return <AppTabBar {...props} />;
+}
+
+/**
+ * The five bottom-nav destinations (design system §6).
+ *
+ * All of the bar's styling lives in `DbfTabBar`: the translucent fill, the
+ * hairline top border, the 24px icons, the 12px labels, the brand pill over the
+ * active tab and the single gesture-bar inset. Nothing here sets a tint colour,
+ * because the custom bar resolves its own colours from the active theme.
+ */
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        // primaryStrong (#047857, 5.48:1): tab labels are small text; colors.primary is only 3.77:1.
-        tabBarActiveTintColor: colors.primaryStrong,
-        tabBarInactiveTintColor: colors.textSecondary,
-      }}
-    >
+    <Tabs screenOptions={{ headerShown: false }} tabBar={renderTabBar}>
       <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('home') }} />
       <Tabs.Screen name="workout" options={{ title: 'Workout', tabBarIcon: icon('workout') }} />
       <Tabs.Screen name="food" options={{ title: 'Food', tabBarIcon: icon('food') }} />

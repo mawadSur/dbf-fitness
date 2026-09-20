@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { PressableBase } from '../ui/PressableBase';
 
 export function LoadingBlock({ label = 'Loading…' }: { label?: string }) {
   return (
@@ -20,23 +21,24 @@ export function ErrorBlock({ message, onRetry }: { message: string; onRetry?: ()
         {message}
       </Text>
       {onRetry ? (
-        <Pressable
+        <PressableBase
           onPress={onRetry}
           accessibilityRole="button"
           accessibilityLabel="Retry"
           android_ripple={{ color: '#FECACA' }}
-          style={({ pressed }) => ({
+          pressFeedback={0.7}
+          // Layout NEVER goes in a style callback — see `PressableBase`.
+          style={{
             minHeight: 44,
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: 10,
             borderWidth: 1,
             borderColor: '#B91C1C',
-            opacity: pressed ? 0.7 : 1,
-          })}
+          }}
         >
           <Text style={{ fontWeight: '600', color: '#B91C1C' }}>Retry</Text>
-        </Pressable>
+        </PressableBase>
       ) : null}
     </View>
   );
@@ -80,14 +82,16 @@ export function PrimaryButton({
   const off = !!disabled || !!busy;
   const solid = variant === 'solid';
   return (
-    <Pressable
+    <PressableBase
       onPress={onPress}
       disabled={off}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: off, busy: !!busy }}
       android_ripple={{ color: '#A7F3D0' }}
-      style={({ pressed }) => ({
+      pressFeedback={0.8}
+      // Layout NEVER goes in a style callback — see `PressableBase`.
+      style={{
         minHeight: 44,
         alignItems: 'center',
         justifyContent: 'center',
@@ -95,14 +99,13 @@ export function PrimaryButton({
         backgroundColor: solid ? (off ? '#6EE7B7' : '#047857') : 'transparent',
         borderWidth: solid ? 0 : 1,
         borderColor: '#047857',
-        opacity: pressed ? 0.8 : 1,
-      })}
+      }}
     >
       {busy ? (
         <ActivityIndicator color={solid ? '#FFFFFF' : '#047857'} />
       ) : (
         <Text style={{ fontWeight: '600', color: solid ? '#FFFFFF' : '#047857' }}>{label}</Text>
       )}
-    </Pressable>
+    </PressableBase>
   );
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
 import { SPECIALTY_MAX_LENGTH } from '../../features/coaching/validators';
+import { PressableBase } from '../ui/PressableBase';
 
 export function SpecialtyChipList({ items }: { items: string[] }) {
   if (items.length === 0) return null;
@@ -41,23 +42,24 @@ export function SpecialtyChipInput({ items, onChange, error, onSubmitEditing, re
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
         {items.map((s) => (
-          <Pressable
+          <PressableBase
             key={s}
             onPress={() => onChange(items.filter((i) => i !== s))}
             accessibilityRole="button"
             accessibilityLabel={`Remove ${s}`}
             android_ripple={{ color: '#A7F3D0' }}
-            style={({ pressed }) => ({
+            pressFeedback={0.7}
+            // Layout NEVER goes in a style callback — see `PressableBase`.
+            style={{
               minHeight: 44,
               justifyContent: 'center',
               backgroundColor: '#D1FAE5',
               borderRadius: 999,
               paddingHorizontal: 12,
-              opacity: pressed ? 0.7 : 1,
-            })}
+            }}
           >
             <Text style={{ fontSize: 14, color: '#065F46' }}>{s}  ×</Text>
-          </Pressable>
+          </PressableBase>
         ))}
       </View>
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -86,25 +88,26 @@ export function SpecialtyChipInput({ items, onChange, error, onSubmitEditing, re
             color: '#0F172A',
           }}
         />
-        <Pressable
+        <PressableBase
           onPress={commit}
           accessibilityRole="button"
           accessibilityLabel="Add specialty"
           accessibilityState={{ disabled: draft.trim().length === 0 }}
           disabled={draft.trim().length === 0}
           android_ripple={{ color: '#A7F3D0' }}
-          style={({ pressed }) => ({
+          pressFeedback={0.8}
+          // Layout NEVER goes in a style callback — see `PressableBase`.
+          style={{
             minHeight: 44,
             minWidth: 64,
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: 10,
             backgroundColor: draft.trim() ? '#047857' : '#E2E8F0',
-            opacity: pressed ? 0.8 : 1,
-          })}
+          }}
         >
           <Text style={{ color: draft.trim() ? '#FFFFFF' : '#475569', fontWeight: '600' }}>Add</Text>
-        </Pressable>
+        </PressableBase>
       </View>
       {error ? (
         <Text accessibilityRole="alert" style={{ color: '#B91C1C', fontSize: 13 }}>

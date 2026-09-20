@@ -1,19 +1,35 @@
 import { render } from '@testing-library/react-native';
 
 import TabsLayout from '../../app/(tabs)/_layout';
-import { colors } from '../theme/tokens';
 
-type Captured = { screenOptions?: Record<string, unknown> };
+type Captured = { screenOptions?: Record<string, unknown>; tabBar?: unknown };
 const mockCaptured: Captured = {};
 const mockScreens: string[] = [];
+const mockTitles: Record<string, string> = {};
 
 jest.mock('expo-router', () => {
-  function Tabs({ screenOptions, children }: { screenOptions: Record<string, unknown>; children: unknown }) {
+  function Tabs({
+    screenOptions,
+    tabBar,
+    children,
+  }: {
+    screenOptions: Record<string, unknown>;
+    tabBar: unknown;
+    children: unknown;
+  }) {
     mockCaptured.screenOptions = screenOptions;
+    mockCaptured.tabBar = tabBar;
     return children;
   }
-  Tabs.Screen = function Screen({ name, options }: { name: string; options: { tabBarIcon?: unknown } }) {
+  Tabs.Screen = function Screen({
+    name,
+    options,
+  }: {
+    name: string;
+    options: { title?: string; tabBarIcon?: unknown };
+  }) {
     if (options.tabBarIcon) mockScreens.push(name);
+    if (options.title) mockTitles[name] = options.title;
     return null;
   };
   return { Tabs };
@@ -29,14 +45,26 @@ function luminance(hex: string): number {
 const contrastOnWhite = (hex: string) => 1.05 / (luminance(hex) + 0.05);
 
 describe('tab layout', () => {
-  it('gives all five tabs an icon and AA-contrast label colors on white', async () => {
+  it('keeps the five tabs, their titles and their icons', async () => {
     await render(<TabsLayout />);
     expect(mockScreens).toEqual(['index', 'workout', 'food', 'community', 'profile']);
-    const active = mockCaptured.screenOptions?.tabBarActiveTintColor as string;
-    const inactive = mockCaptured.screenOptions?.tabBarInactiveTintColor as string;
-    expect(active).toBe(colors.primaryStrong);
-    expect(contrastOnWhite(active)).toBeGreaterThanOrEqual(4.5);
-    expect(contrastOnWhite(inactive)).toBeGreaterThanOrEqual(4.5);
+    expect(mockTitles).toEqual({
+      index: 'Home',
+      workout: 'Workout',
+      food: 'Food',
+      community: 'Community',
+      profile: 'Profile',
+    });
+  });
+
+  it('renders the DBF tab bar instead of the stock one', async () => {
+    await render(<TabsLayout />);
+    expect(typeof mockCaptured.tabBar).toBe('function');
+    expect(mockCaptured.screenOptions?.headerShown).toBe(false);
+    // Colours are the custom bar's job now, so the navigator must not set tints
+    // that would silently disagree with it.
+    expect(mockCaptured.screenOptions?.tabBarActiveTintColor).toBeUndefined();
+    expect(mockCaptured.screenOptions?.tabBarInactiveTintColor).toBeUndefined();
   });
 
   it('keeps milestone (text) colors AA on white', () => {

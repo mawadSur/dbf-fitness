@@ -1,7 +1,8 @@
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import type { ChooseCoachErrorCode } from '../../features/coaching/types';
 import { chooseCoachErrorMessage, isRetryable } from './confirmFlow';
+import { PressableBase } from '../ui/PressableBase';
 
 type Props = {
   coachName: string;
@@ -29,14 +30,16 @@ export function ConfirmPanel({ coachName, hasCurrentCoach, saving, errorCode, on
         </Text>
       ) : null}
       <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Pressable
+        <PressableBase
           onPress={onCancel}
           disabled={saving}
           accessibilityRole="button"
           accessibilityLabel="Cancel"
           accessibilityState={{ disabled: saving }}
           android_ripple={{ color: '#E2E8F0' }}
-          style={({ pressed }) => ({
+          pressFeedback={0.7}
+          // Layout NEVER goes in a style callback — see `PressableBase`.
+          style={{
             flex: 1,
             minHeight: 44,
             alignItems: 'center',
@@ -44,31 +47,31 @@ export function ConfirmPanel({ coachName, hasCurrentCoach, saving, errorCode, on
             borderRadius: 12,
             borderWidth: 1,
             borderColor: '#94A3B8',
-            opacity: pressed ? 0.7 : 1,
-          })}
+          }}
         >
           <Text style={{ fontWeight: '600', color: '#334155' }}>{showConfirm ? 'Cancel' : 'Close'}</Text>
-        </Pressable>
+        </PressableBase>
         {showConfirm ? (
-          <Pressable
+          <PressableBase
             onPress={onConfirm}
             disabled={saving}
             accessibilityRole="button"
             accessibilityLabel={errorCode ? 'Retry' : 'Confirm'}
             accessibilityState={{ disabled: saving, busy: saving }}
             android_ripple={{ color: '#A7F3D0' }}
-            style={({ pressed }) => ({
+            pressFeedback={0.85}
+            // Layout NEVER goes in a style callback — see `PressableBase`.
+            style={{
               flex: 1,
               minHeight: 44,
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 12,
               backgroundColor: saving ? '#6EE7B7' : '#047857',
-              opacity: pressed ? 0.85 : 1,
-            })}
+            }}
           >
             {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={{ fontWeight: '600', color: '#FFFFFF' }}>{errorCode ? 'Retry' : 'Confirm'}</Text>}
-          </Pressable>
+          </PressableBase>
         ) : null}
       </View>
     </View>

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 
 import { BottomActionBar } from '../../src/components/notes/BottomActionBar';
 import { NotesButton } from '../../src/components/notes/NotesButton';
@@ -20,6 +20,7 @@ import {
 } from '../../src/services/recordings';
 import { transcriptionErrorMessage } from '../../src/services/transcription/types';
 import { colors } from '../../src/theme/tokens';
+import { PressableBase } from '../../src/components/ui/PressableBase';
 
 function formatSize(bytes?: number): string {
   if (typeof bytes !== 'number') return '';
@@ -221,14 +222,16 @@ export default function UploadRecordingScreen() {
             renderItem={({ item }) => {
               const selected = item.id === selectedId;
               return (
-                <Pressable
+                <PressableBase
                   onPress={() => setPickedId(item.id)}
                   disabled={uploading}
                   accessibilityRole="radio"
                   accessibilityLabel={item.title}
                   accessibilityState={{ selected, disabled: uploading }}
                   android_ripple={{ color: '#D1FAE5' }}
-                  style={({ pressed }) => ({
+                  pressFeedback={0.75}
+                  // Layout NEVER goes in a style callback — see `PressableBase`.
+                  style={{
                     minHeight: 56,
                     borderWidth: 2,
                     borderColor: selected ? colors.primary : '#E2E8F0',
@@ -237,14 +240,13 @@ export default function UploadRecordingScreen() {
                     paddingHorizontal: 14,
                     paddingVertical: 10,
                     justifyContent: 'center',
-                    opacity: pressed ? 0.75 : 1,
-                  })}
+                  }}
                 >
                   <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: '600', color: '#0F172A' }}>
                     {item.title}
                   </Text>
                   <Text style={{ fontSize: 13, color: '#475569' }}>{formatRecordingDate(item.starts_at)}</Text>
-                </Pressable>
+                </PressableBase>
               );
             }}
             ListFooterComponent={

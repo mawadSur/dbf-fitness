@@ -1,6 +1,7 @@
-import { ActivityIndicator, Platform, Pressable, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Platform, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors } from '../../theme/tokens';
+import { PressableBase } from '../ui/PressableBase';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
@@ -36,14 +37,16 @@ export function NotesButton({
   const inactive = disabled || busy;
 
   return (
-    <Pressable
+    <PressableBase
       onPress={inactive ? undefined : onPress}
       disabled={inactive}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: inactive, busy }}
       android_ripple={{ color: palette.ripple }}
-      style={({ pressed }) => [
+      pressFeedback={inactive ? 'none' : 0.8}
+      // Layout NEVER goes in a style callback — see `PressableBase`.
+      style={[
         {
           minHeight: 48,
           minWidth: 48,
@@ -58,13 +61,13 @@ export function NotesButton({
           flexDirection: 'row',
           gap: 8,
           overflow: Platform.OS === 'android' ? 'hidden' : 'visible',
-          opacity: inactive ? 0.55 : pressed ? 0.8 : 1,
+          opacity: inactive ? 0.55 : 1,
         },
         style,
       ]}
     >
       {busy ? <ActivityIndicator size="small" color={palette.text} /> : null}
       <Text style={{ color: palette.text, fontSize: 16, fontWeight: '600' }}>{label}</Text>
-    </Pressable>
+    </PressableBase>
   );
 }

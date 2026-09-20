@@ -59,7 +59,8 @@ describe('every KeyboardAvoidingView call site', () => {
     .filter(({ src }) => /<KeyboardAvoidingView\b/.test(src));
 
   it('finds the known call sites (guards against this scan going blind)', () => {
-    expect(sites.length).toBe(7);
+    // 8th site: `src/components/ui/ScreenShell.tsx`, the design-system shell.
+    expect(sites.length).toBe(8);
   });
 
   it.each(sites.map((s) => [s.file.replace(root + '/', ''), s.src] as const))(

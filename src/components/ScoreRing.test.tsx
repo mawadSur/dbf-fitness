@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react-native';
 
-import { colors } from '../theme/tokens';
+import { Appearance } from 'react-native';
+
+import { ThemeProvider } from '../theme/ThemeProvider';
+import { colors, lightTheme } from '../theme/tokens';
 import { ScoreRing } from './ScoreRing';
 
 describe('theme tokens', () => {
@@ -23,5 +26,25 @@ describe('ScoreRing', () => {
     expect(screen.getByRole('progressbar').props.accessibilityLabel).toBe('Day streak 30 of 30');
     await screen.rerender(<ScoreRing value={-4} max={30} label="Streak" />);
     expect(screen.getByRole('progressbar').props.accessibilityLabel).toBe('Streak 0 of 30');
+  });
+});
+
+describe('ScoreRing palette pin', () => {
+  /*
+   * The home screen still paints the hard-coded white legacy page, so the ring
+   * must keep the light palette even when the member's theme resolves to dark
+   * — the same reason the status bar and the tab bar are pinned.
+   */
+  it('keeps the light palette under the dark theme', async () => {
+    jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('dark');
+    await render(
+      <ThemeProvider>
+        <ScoreRing value={5} max={30} label="Day streak" />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText('5').props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ color: lightTheme.text })]),
+    );
+    jest.restoreAllMocks();
   });
 });

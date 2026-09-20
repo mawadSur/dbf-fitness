@@ -1,9 +1,10 @@
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Text, View } from 'react-native';
 
 import { itemSublabel } from '../../features/notes/checklist';
 import { summarizeProgress } from '../../features/notes/progress';
 import type { NoteChecklist } from '../../services/transcription/types';
 import { colors } from '../../theme/tokens';
+import { PressableBase } from '../ui/PressableBase';
 
 type Props = {
   checklist: NoteChecklist;
@@ -77,14 +78,16 @@ export function MemberChecklist({
         const checked = checkedKeys.has(item.key);
         const sublabel = itemSublabel(item);
         return (
-          <Pressable
+          <PressableBase
             onPress={() => onToggle(item.key, checked)}
             disabled={readOnly}
             accessibilityRole={readOnly ? 'text' : 'checkbox'}
             accessibilityLabel={item.text}
             accessibilityState={{ checked }}
             android_ripple={{ color: '#D1FAE5' }}
-            style={({ pressed }) => ({
+            pressFeedback={0.75}
+            // Layout NEVER goes in a style callback — see `PressableBase`.
+            style={{
               minHeight: 56,
               flexDirection: 'row',
               alignItems: 'center',
@@ -95,8 +98,7 @@ export function MemberChecklist({
               borderRadius: 12,
               paddingHorizontal: 12,
               paddingVertical: 10,
-              opacity: pressed ? 0.75 : 1,
-            })}
+            }}
           >
             {readOnly ? null : (
             <View
@@ -127,7 +129,7 @@ export function MemberChecklist({
               </Text>
               {sublabel ? <Text style={{ fontSize: 13, color: '#475569' }}>{sublabel}</Text> : null}
             </View>
-          </Pressable>
+          </PressableBase>
         );
       }}
     />

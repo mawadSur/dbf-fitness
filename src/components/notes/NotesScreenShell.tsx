@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PressableBase } from '../ui/PressableBase';
 
 type NotesScreenShellProps = {
   title: string;
@@ -35,23 +36,24 @@ export function NotesScreenShell({ title, children, fallbackHref = '/(tabs)' }: 
           paddingVertical: 4,
         }}
       >
-        <Pressable
+        <PressableBase
           onPress={goBack}
           accessibilityRole="button"
           accessibilityLabel="Go back"
           android_ripple={{ color: '#D1FAE5', borderless: true }}
           hitSlop={8}
-          style={({ pressed }) => ({
+          pressFeedback={0.6}
+          // Layout NEVER goes in a style callback — see `PressableBase`.
+          style={{
             minWidth: 44,
             minHeight: 44,
             paddingHorizontal: 8,
             alignItems: 'center',
             justifyContent: 'center',
-            opacity: pressed ? 0.6 : 1,
-          })}
+          }}
         >
           <Text style={{ color: '#047857', fontSize: 16, fontWeight: '600' }}>‹ Back</Text>
-        </Pressable>
+        </PressableBase>
         <Text
           numberOfLines={1}
           accessibilityRole="header"

@@ -1,9 +1,10 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { RETRY_COPY, retryReason } from '../../features/notes/status';
 import type { RecordingSummary } from '../../features/notes/types';
 import { NotesButton } from './NotesButton';
 import { StatusChip } from './StatusChip';
+import { PressableBase } from '../ui/PressableBase';
 
 export function formatRecordingDate(iso: string | null): string {
   if (!iso) return '';
@@ -37,17 +38,18 @@ export function RecordingListItem({ recording, showStatus, onPress, onRetry, ret
         overflow: 'hidden',
       }}
     >
-      <Pressable
+      <PressableBase
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={`Open ${title}`}
         android_ripple={{ color: '#E2E8F0' }}
-        style={({ pressed }) => ({
+        pressFeedback={0.75}
+        // Layout NEVER goes in a style callback — see `PressableBase`.
+        style={{
           minHeight: 64,
           padding: 16,
           gap: 6,
-          opacity: pressed ? 0.75 : 1,
-        })}
+        }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Text numberOfLines={1} style={{ flex: 1, fontSize: 16, fontWeight: '600', color: '#0F172A' }}>
@@ -61,7 +63,7 @@ export function RecordingListItem({ recording, showStatus, onPress, onRetry, ret
             {(reason === 'failed' ? recording.errorMessage : null) ?? RETRY_COPY[reason].explanation}
           </Text>
         ) : null}
-      </Pressable>
+      </PressableBase>
       {onRetry && reason ? (
         <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
           <NotesButton

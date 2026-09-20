@@ -1,6 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { ChecklistRow } from './ChecklistRow';
+import { CHECK_TARGET_SIZE } from './ui/ChecklistRow';
+
+function flatten(style: unknown): Record<string, unknown> {
+  if (Array.isArray(style)) return Object.assign({}, ...style.map(flatten));
+  return (style ?? {}) as Record<string, unknown>;
+}
 
 describe('ChecklistRow', () => {
   it('labels the checkbox with the row label and reflects checked state', async () => {
@@ -8,7 +14,11 @@ describe('ChecklistRow', () => {
     await render(<ChecklistRow label="Squats" sublabel="3x10" checked onToggle={onToggle} />);
     const box = screen.getByRole('checkbox', { name: 'Squats' });
     expect(box.props.accessibilityState.checked).toBe(true);
-    expect(box.props.className).toContain('h-11 w-11');
+    // The row now delegates to the design-system component, whose toggle target
+    // is a single 48pt square (>= 44pt iOS and >= 48dp Android).
+    const style = flatten(box.props.style);
+    expect(style.width).toBe(CHECK_TARGET_SIZE);
+    expect(style.height).toBe(CHECK_TARGET_SIZE);
     await fireEvent.press(box);
     expect(onToggle).toHaveBeenCalledTimes(1);
   });

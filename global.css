@@ -1,3 +1,90 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * DBF design system — semantic colour tokens (see docs/design-system.md).
+ *
+ * Values are space-separated sRGB channels so Tailwind can compose them as
+ * `rgb(var(--color-x) / <alpha-value>)`. `:root` is the light theme, `.dark:root`
+ * the dark theme; NativeWind toggles the `dark` class through `colorScheme.set()`
+ * (driven by src/theme/ThemeProvider.tsx), which is why `darkMode: 'class'` stays
+ * in tailwind.config.js.
+ *
+ * The same values live, as hex, in src/theme/tokens.ts for React Native style
+ * props and SVG. src/theme/contrast.test.ts is the guard that keeps every
+ * documented pair at or above its WCAG minimum in BOTH themes.
+ */
+@layer base {
+  :root {
+    /* surfaces */
+    --color-bg: 255 255 255;
+    --color-bg-soft: 236 253 245;
+    --color-surface: 255 255 255;
+    --color-surface-raised: 255 255 255;
+
+    /* content */
+    --color-text: 2 44 34;
+    --color-text-secondary: 4 120 87;
+    --color-text-muted: 75 85 99;
+
+    /* brand */
+    --color-brand: 5 150 105;
+    --color-cta: 2 44 34;
+    --color-on-cta: 255 255 255;
+    --color-sage: 110 231 183;
+    --color-progress-arc: 4 120 87;
+    --color-progress-track: 110 231 183;
+
+    /* lines */
+    --color-border-soft: 167 243 208;
+    --color-border-strong: 107 114 128;
+    --color-focus: 5 150 105;
+
+    /* status */
+    --color-success: 4 120 87;
+    --color-success-bg: 209 250 229;
+    --color-warning: 180 83 9;
+    --color-warning-bg: 254 243 199;
+    --color-danger: 185 28 28;
+    --color-danger-bg: 254 226 226;
+    --color-info: 29 78 216;
+    --color-info-bg: 219 234 254;
+  }
+
+  .dark:root {
+    /* surfaces */
+    --color-bg: 1 26 20;
+    --color-bg-soft: 2 44 34;
+    --color-surface: 10 61 48;
+    --color-surface-raised: 11 74 58;
+
+    /* content */
+    --color-text: 236 253 245;
+    --color-text-secondary: 167 243 208;
+    --color-text-muted: 168 179 190;
+
+    /* brand */
+    --color-brand: 52 211 153;
+    --color-cta: 52 211 153;
+    --color-on-cta: 2 44 34;
+    --color-sage: 110 231 183;
+    --color-progress-arc: 52 211 153;
+    --color-progress-track: 6 95 70;
+
+    /* lines */
+    --color-border-soft: 6 95 70;
+    --color-border-strong: 110 231 183;
+    --color-focus: 52 211 153;
+
+    /* status */
+    --color-success: 52 211 153;
+    --color-success-bg: 6 78 59;
+    --color-warning: 252 211 77;
+    --color-warning-bg: 66 32 6;
+    --color-danger: 252 165 165;
+    --color-danger-bg: 69 10 10;
+    --color-info: 147 197 253;
+    --color-info-bg: 23 37 84;
+  }
+}

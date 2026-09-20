@@ -219,3 +219,28 @@ insert into public.coach_profiles (coach_id, bio, specialties, accepting_members
     array['Conditioning', 'Endurance', 'Mobility'],
     true
   );
+
+-- Pin the bundled pictogram for each seeded exercise (exercises.image_key; null = resolve from name).
+--
+-- Scoped to the days of THIS seed's plan (33333333-…). `exercises.name` is not
+-- unique — nothing stops a coach creating their own "Push-Ups" in the app, or a
+-- later seed adding another plan with the same movement names — so a bare
+-- `where name = …` reached out of the seed and rewrote rows it does not own.
+update public.exercises as e
+set image_key = pin.image_key
+from (
+  values
+    ('Bodyweight Squats', 'bodyweight-squat'),
+    ('Burpees', 'burpee'),
+    ('High Knees', 'high-knees'),
+    ('Mountain Climbers', 'mountain-climber'),
+    ('Plank Hold', 'plank'),
+    ('Push-Ups', 'push-up'),
+    ('Walking Lunges', 'walking-lunge')
+) as pin (name, image_key)
+where e.name = pin.name
+  and e.workout_day_id in (
+    select id
+    from public.workout_days
+    where workout_plan_id = '33333333-3333-3333-3333-333333333333'
+  );

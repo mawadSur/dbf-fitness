@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
-  Pressable,
   Text,
   TextInput,
   View,
@@ -20,6 +19,7 @@ import {
   type AccountRole,
 } from '../../features/account/deleteAccount';
 import type { DeleteAccountErrorCode } from '../../features/account/api';
+import { PressableBase } from '../ui/PressableBase';
 
 // #B91C1C is 6.4:1 on white and 5.9:1 on the #FEF2F2 panel; #FFFFFF on #B91C1C is 6.4:1. The
 // disabled fill #FCA5A5 is never used behind text that has to be read as a label (the label sits
@@ -129,7 +129,7 @@ export function DeleteAccountPanel({ role, memberCount, onDelete, onDeleted, onO
         <Text style={{ fontSize: 14, color: '#334155' }}>
           Permanently delete your account and personal data. This cannot be undone.
         </Text>
-        <Pressable
+        <PressableBase
           onPress={() => {
             setOpen(true);
             onOpen?.();
@@ -137,7 +137,9 @@ export function DeleteAccountPanel({ role, memberCount, onDelete, onDeleted, onO
           accessibilityRole="button"
           accessibilityLabel="Delete account"
           android_ripple={{ color: PANEL_BORDER }}
-          style={({ pressed }) => ({
+          pressFeedback={0.7}
+          // Layout NEVER goes in a style callback — see `PressableBase`.
+          style={{
             minHeight: 44,
             alignItems: 'center',
             justifyContent: 'center',
@@ -145,11 +147,10 @@ export function DeleteAccountPanel({ role, memberCount, onDelete, onDeleted, onO
             borderWidth: 1,
             borderColor: DANGER,
             paddingHorizontal: 16,
-            opacity: pressed ? 0.7 : 1,
-          })}
+          }}
         >
           <Text style={{ fontWeight: '600', color: DANGER }}>Delete account</Text>
-        </Pressable>
+        </PressableBase>
       </View>
     );
   }
@@ -255,14 +256,16 @@ export function DeleteAccountPanel({ role, memberCount, onDelete, onDeleted, onO
         ) : null}
 
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Pressable
+          <PressableBase
             onPress={close}
             disabled={busy}
             accessibilityRole="button"
             accessibilityLabel={showForm ? 'Cancel' : 'Close'}
             accessibilityState={{ disabled: busy }}
             android_ripple={{ color: '#E2E8F0' }}
-            style={({ pressed }) => ({
+            pressFeedback={0.7}
+            // Layout NEVER goes in a style callback — see `PressableBase`.
+            style={{
               flex: 1,
               minHeight: 44,
               alignItems: 'center',
@@ -271,21 +274,22 @@ export function DeleteAccountPanel({ role, memberCount, onDelete, onDeleted, onO
               borderWidth: 1,
               borderColor: '#94A3B8',
               backgroundColor: '#FFFFFF',
-              opacity: pressed ? 0.7 : 1,
-            })}
+            }}
           >
             <Text style={{ fontWeight: '600', color: '#334155' }}>{showForm ? 'Cancel' : 'Close'}</Text>
-          </Pressable>
+          </PressableBase>
 
           {showForm ? (
-            <Pressable
+            <PressableBase
               onPress={submit}
               disabled={!ready}
               accessibilityRole="button"
               accessibilityLabel="Permanently delete"
               accessibilityState={{ disabled: !ready, busy }}
               android_ripple={{ color: '#FECACA' }}
-              style={({ pressed }) => ({
+              pressFeedback={0.85}
+              // Layout NEVER goes in a style callback — see `PressableBase`.
+              style={{
                 flex: 1,
                 minHeight: 44,
                 alignItems: 'center',
@@ -293,8 +297,7 @@ export function DeleteAccountPanel({ role, memberCount, onDelete, onDeleted, onO
                 borderRadius: 12,
                 paddingHorizontal: 12,
                 backgroundColor: ready ? DANGER : DANGER_DISABLED,
-                opacity: pressed ? 0.85 : 1,
-              })}
+              }}
             >
               {busy ? (
                 <ActivityIndicator color="#FFFFFF" />
@@ -306,7 +309,7 @@ export function DeleteAccountPanel({ role, memberCount, onDelete, onDeleted, onO
                   Permanently delete
                 </Text>
               )}
-            </Pressable>
+            </PressableBase>
           ) : null}
         </View>
       </View>

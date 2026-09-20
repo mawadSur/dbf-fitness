@@ -1,9 +1,10 @@
 import type { Dispatch } from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, Text, TextInput, View } from 'react-native';
 
 import type { EditorAction, EditorState } from '../../features/notes/checklist';
 import { MAX_CHECKLIST_ITEMS, type NoteChecklistItem } from '../../services/transcription/types';
 import { NotesButton } from './NotesButton';
+import { PressableBase } from '../ui/PressableBase';
 
 type Props = {
   state: EditorState;
@@ -35,23 +36,25 @@ function IconButton({
   disabled?: boolean;
 }) {
   return (
-    <Pressable
+    <PressableBase
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}
       android_ripple={{ color: '#E2E8F0', borderless: true }}
-      style={({ pressed }) => ({
+      pressFeedback={disabled ? 'none' : 0.6}
+      // Layout NEVER goes in a style callback — see `PressableBase`.
+      style={{
         minWidth: 44,
         minHeight: 44,
         alignItems: 'center',
         justifyContent: 'center',
-        opacity: disabled ? 0.35 : pressed ? 0.6 : 1,
-      })}
+        opacity: disabled ? 0.35 : 1,
+      }}
     >
       <Text style={{ fontSize: 18, color: '#334155' }}>{glyph}</Text>
-    </Pressable>
+    </PressableBase>
   );
 }
 
@@ -123,14 +126,16 @@ function EditorRow({
       ) : null}
 
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Pressable
+        <PressableBase
           onPress={() => dispatch({ type: 'toggleKind', key: item.key })}
           disabled={disabled}
           accessibilityRole="button"
           accessibilityLabel={`${position} is ${item.kind === 'exercise' ? 'an exercise' : 'a note'}. Switch type`}
           accessibilityState={{ disabled }}
           android_ripple={{ color: '#E2E8F0' }}
-          style={({ pressed }) => ({
+          pressFeedback={0.7}
+          // Layout NEVER goes in a style callback — see `PressableBase`.
+          style={{
             minHeight: 44,
             paddingHorizontal: 12,
             borderRadius: 10,
@@ -138,13 +143,12 @@ function EditorRow({
             borderColor: '#CBD5E1',
             backgroundColor: '#FFFFFF',
             justifyContent: 'center',
-            opacity: pressed ? 0.7 : 1,
-          })}
+          }}
         >
           <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A' }}>
             {item.kind === 'exercise' ? 'Exercise' : 'Note'}
           </Text>
-        </Pressable>
+        </PressableBase>
 
         <View style={{ flexDirection: 'row' }}>
           <IconButton
@@ -165,24 +169,26 @@ function EditorRow({
       {/* Removing is destructive, so it lives on its own row, well away from the edit and reorder
           controls, as a labelled button rather than a bare glyph one thumb-slip from "move down". */}
       <View style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 8, alignItems: 'flex-end' }}>
-        <Pressable
+        <PressableBase
           onPress={() => dispatch({ type: 'delete', key: item.key })}
           disabled={disabled}
           accessibilityRole="button"
           accessibilityLabel={`Delete ${position}`}
           accessibilityState={{ disabled }}
           android_ripple={{ color: '#FEE2E2' }}
-          style={({ pressed }) => ({
+          pressFeedback={disabled ? 'none' : 0.6}
+          // Layout NEVER goes in a style callback — see `PressableBase`.
+          style={{
             minHeight: 44,
             minWidth: 44,
             paddingHorizontal: 12,
             borderRadius: 10,
             justifyContent: 'center',
-            opacity: disabled ? 0.35 : pressed ? 0.6 : 1,
-          })}
+            opacity: disabled ? 0.35 : 1,
+          }}
         >
           <Text style={{ fontSize: 14, fontWeight: '600', color: '#B91C1C' }}>Remove</Text>
-        </Pressable>
+        </PressableBase>
       </View>
     </View>
   );

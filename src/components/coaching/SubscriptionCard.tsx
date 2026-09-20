@@ -1,7 +1,8 @@
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 
 import { graceReminderCopy, type SubscriptionInfo } from '../../features/subscriptions/state';
 import { subscriptionChip } from './coachCardState';
+import { PressableBase } from '../ui/PressableBase';
 
 const TONES = {
   good: { bg: '#D1FAE5', fg: '#065F46' },
@@ -39,24 +40,25 @@ export function SubscriptionCard({ info }: { info: SubscriptionInfo }) {
       <Text style={{ fontSize: 14, color: '#334155', lineHeight: 20 }}>{copy.body}</Text>
       {needsAction ? (
         url ? (
-          <Pressable
+          <PressableBase
             onPress={() => {
               Linking.openURL(url).catch(() => undefined);
             }}
             accessibilityRole="button"
             accessibilityLabel={cta}
             android_ripple={{ color: '#A7F3D0' }}
-            style={({ pressed }) => ({
+            pressFeedback={0.85}
+            // Layout NEVER goes in a style callback — see `PressableBase`.
+            style={{
               minHeight: 44,
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 12,
               backgroundColor: '#047857',
-              opacity: pressed ? 0.85 : 1,
-            })}
+            }}
           >
             <Text style={{ fontWeight: '600', color: '#FFFFFF' }}>{cta}</Text>
-          </Pressable>
+          </PressableBase>
         ) : (
           <Text style={{ fontSize: 14, fontWeight: '600', color: '#047857' }}>Contact your coach to renew</Text>
         )

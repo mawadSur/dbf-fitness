@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { Coach, MyCoach } from '../../features/coaching/types';
 import { coachCardState, initialOf } from './coachCardState';
 import { SpecialtyChipList } from './SpecialtyChips';
+import { PressableBase } from '../ui/PressableBase';
 
 const BIO_COLLAPSED_LINES = 3;
 
@@ -67,7 +68,7 @@ export function CoachCard({ coach, currentCoachId, onSelect, disabled }: Props) 
             {bio}
           </Text>
           {longBio ? (
-            <Pressable
+            <PressableBase
               onPress={() => setExpanded((v) => !v)}
               accessibilityRole="button"
               accessibilityLabel={expanded ? `Show less about ${coach.fullName}` : `Read more about ${coach.fullName}`}
@@ -75,7 +76,7 @@ export function CoachCard({ coach, currentCoachId, onSelect, disabled }: Props) 
               style={{ minHeight: 44, justifyContent: 'center' }}
             >
               <Text style={{ color: '#047857', fontWeight: '600' }}>{expanded ? 'Show less' : 'Read more'}</Text>
-            </Pressable>
+            </PressableBase>
           ) : null}
         </View>
       ) : null}
@@ -83,26 +84,27 @@ export function CoachCard({ coach, currentCoachId, onSelect, disabled }: Props) 
       <SpecialtyChipList items={coach.specialties} />
 
       {onSelect ? (
-        <Pressable
+        <PressableBase
           onPress={() => onSelect(coach)}
           disabled={!state.selectable || disabled}
           accessibilityRole="button"
           accessibilityLabel={`Choose ${coach.fullName} as your coach`}
           accessibilityState={{ disabled: !state.selectable || !!disabled }}
           android_ripple={{ color: '#A7F3D0' }}
-          style={({ pressed }) => ({
+          pressFeedback={0.85}
+          // Layout NEVER goes in a style callback — see `PressableBase`.
+          style={{
             minHeight: 44,
             alignItems: 'center',
             justifyContent: 'center',
             borderRadius: 12,
             backgroundColor: state.selectable && !disabled ? '#047857' : '#E2E8F0',
-            opacity: pressed ? 0.85 : 1,
-          })}
+          }}
         >
           <Text style={{ fontWeight: '600', color: state.selectable && !disabled ? '#FFFFFF' : '#475569' }}>
             {state.isCurrent ? 'Current coach' : state.selectable ? 'Choose coach' : 'Not accepting'}
           </Text>
-        </Pressable>
+        </PressableBase>
       ) : null}
     </View>
   );
@@ -121,23 +123,24 @@ export function CurrentCoachCard({ coach, onChange }: { coach: MyCoach; onChange
       </View>
       {bio ? <Text style={{ fontSize: 14, color: '#334155', lineHeight: 20 }}>{bio}</Text> : null}
       <SpecialtyChipList items={coach.specialties} />
-      <Pressable
+      <PressableBase
         onPress={onChange}
         accessibilityRole="button"
         accessibilityLabel="Change coach"
         android_ripple={{ color: '#A7F3D0' }}
-        style={({ pressed }) => ({
+        pressFeedback={0.7}
+        // Layout NEVER goes in a style callback — see `PressableBase`.
+        style={{
           minHeight: 44,
           alignItems: 'center',
           justifyContent: 'center',
           borderRadius: 12,
           borderWidth: 1,
           borderColor: '#047857',
-          opacity: pressed ? 0.7 : 1,
-        })}
+        }}
       >
         <Text style={{ fontWeight: '600', color: '#047857' }}>Change coach</Text>
-      </Pressable>
+      </PressableBase>
     </View>
   );
 }

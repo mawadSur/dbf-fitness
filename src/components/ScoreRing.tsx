@@ -1,7 +1,7 @@
-import { Text, View } from 'react-native';
-import { Circle, Svg } from 'react-native-svg';
-
-import { colors } from '../theme/tokens';
+import { chromeScheme } from '../theme/chrome';
+import { useOptionalTheme } from '../theme/ThemeProvider';
+import { themes } from '../theme/tokens';
+import { ProgressRing } from './ui/ProgressRing';
 
 type ScoreRingProps = {
   value: number;
@@ -9,53 +9,24 @@ type ScoreRingProps = {
   label: string;
 };
 
-const SIZE = 120;
-const STROKE_WIDTH = 10;
-const RADIUS = (SIZE - STROKE_WIDTH) / 2;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-
+/**
+ * @deprecated Import `ProgressRing` from `src/components/ui` instead.
+ *
+ * Kept so `app/(tabs)/index.tsx` keeps the exact same props (and the same
+ * accessible summary, `"<label> <value> of <max>"`) while it waits to be
+ * restyled. It renders the design-system ring, so the home screen gets the
+ * reduced-motion-aware version for free.
+ *
+ * It is pinned to the LIGHT palette on purpose. The home screen still paints a
+ * hard-coded `#FFFFFF` page from the legacy palette, so a themed ring on it in
+ * dark mode drew `#ECFDF5` text on white — 1.05:1, i.e. an invisible streak
+ * number on the app's landing screen. It is the same pin the status bar and
+ * the tab bar need for the same reason, so it reads the same flag
+ * (`src/theme/chrome.ts`) and comes off with them when the screens migrate.
+ */
 export function ScoreRing({ value, max, label }: ScoreRingProps) {
-  const clampedValue = Math.max(0, Math.min(value, max));
-  const progress = max > 0 ? clampedValue / max : 0;
-  const strokeDashoffset = CIRCUMFERENCE * (1 - progress);
-
+  const { scheme } = useOptionalTheme();
   return (
-    <View
-      className="items-center gap-2"
-      accessible
-      accessibilityRole="progressbar"
-      accessibilityLabel={`${label} ${clampedValue} of ${max}`}
-      accessibilityValue={{ min: 0, max, now: clampedValue }}
-    >
-      <View style={{ width: SIZE, height: SIZE }}>
-        <Svg width={SIZE} height={SIZE}>
-          <Circle
-            cx={SIZE / 2}
-            cy={SIZE / 2}
-            r={RADIUS}
-            stroke={colors.primaryMuted}
-            strokeWidth={STROKE_WIDTH}
-            fill="none"
-          />
-          <Circle
-            cx={SIZE / 2}
-            cy={SIZE / 2}
-            r={RADIUS}
-            stroke={colors.primaryStrong}
-            strokeWidth={STROKE_WIDTH}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
-            strokeDashoffset={strokeDashoffset}
-            transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
-          />
-        </Svg>
-        <View className="absolute inset-0 items-center justify-center">
-          <Text className="text-2xl font-bold text-slate-900">{clampedValue}</Text>
-          <Text className="text-xs text-slate-500">/ {max}</Text>
-        </View>
-      </View>
-      <Text className="text-sm font-medium text-slate-700">{label}</Text>
-    </View>
+    <ProgressRing value={value} max={max} label={label} palette={themes[chromeScheme(scheme)]} />
   );
 }
