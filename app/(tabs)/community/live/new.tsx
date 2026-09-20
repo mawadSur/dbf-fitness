@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { friendlyErrorMessage } from '../../../../src/components/friendlyError';
 import { LiveButton } from '../../../../src/components/live/LiveButton';
 import { ScheduleClassForm } from '../../../../src/components/live/ScheduleClassForm';
 import { fetchCurrentMember } from '../../../../src/features/liveClasses/api';
@@ -28,7 +29,9 @@ export default function ScheduleClassScreen() {
     return (
       <View className="flex-1 gap-3 bg-white px-4" style={{ paddingTop: insets.top + 8 }}>
         <LiveButton label="‹ Back" variant="ghost" onPress={goBack} className="self-start" accessibilityLabel="Back to live classes" />
-        <Text className="text-sm text-red-700">Could not load your profile.</Text>
+        <Text accessibilityRole="alert" className="text-sm text-red-700">
+          {friendlyErrorMessage(memberQuery.error, 'Could not load your profile.')}
+        </Text>
         <LiveButton label="Try again" variant="secondary" onPress={() => void memberQuery.refetch()} />
       </View>
     );

@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AffirmationCard } from '../../src/components/AffirmationCard';
+import { friendlyErrorFromMany } from '../../src/components/friendlyError';
 import { ScoreRing } from '../../src/components/ScoreRing';
 import { useMyCoach } from '../../src/features/coaching';
 import { supabase } from '../../src/services/supabase/client';
@@ -219,7 +220,12 @@ export default function HomeScreen() {
           accessibilityLiveRegion="polite"
           className="gap-2 rounded-xl border border-red-200 bg-red-50 p-4"
         >
-          <Text className="text-sm text-red-700">Some of your info could not be loaded.</Text>
+          <Text className="text-sm text-red-700">
+            {friendlyErrorFromMany(
+              [profileQuery.error, statsQuery.error, todaysWorkoutQuery.error],
+              'Some of your info could not be loaded.',
+            )}
+          </Text>
           <Pressable
             onPress={handleRefresh}
             accessibilityRole="button"

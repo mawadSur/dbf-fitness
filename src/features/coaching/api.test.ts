@@ -37,6 +37,15 @@ describe('mapChooseCoachError', () => {
   it('does not trust a known message without the P0001 code', () => {
     expect(mapChooseCoachError({ code: '42501', message: 'not_a_member' }).code).toBe('unknown');
   });
+  it('maps 22P02 (malformed uuid rejected during argument coercion) to coach_not_found', () => {
+    // PostgREST returns this before choose_coach()'s body runs, so there is no P0001 to read.
+    const e = mapChooseCoachError({
+      code: '22P02',
+      message: 'invalid input syntax for type uuid: "not-a-uuid"',
+    });
+    expect(e).toBeInstanceOf(ChooseCoachError);
+    expect(e.code).toBe('coach_not_found');
+  });
   it('maps non-Postgres error to unknown', () => {
     expect(mapChooseCoachError({ message: 'weird' }).code).toBe('unknown');
     expect(mapChooseCoachError(null).code).toBe('unknown');

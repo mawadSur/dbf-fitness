@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
-import { Linking } from 'react-native';
+import { Linking, ScrollView } from 'react-native';
 
 import CoachProfileScreen from '../../../app/coach/profile';
 import PickCoachScreen from '../../../app/coach/pick';
@@ -125,6 +125,35 @@ describe('profile tab', () => {
     subs.fetchSubscriptionState.mockResolvedValue(sub('active'));
     await fireEvent.press(screen.getAllByLabelText('Retry')[0]);
     await waitFor(() => expect(screen.queryByText('Could not load your subscription.')).toBeNull());
+  });
+
+  it('keeps taps working with the keyboard open and scrolls the danger zone into view on field focus', async () => {
+    jest.useFakeTimers();
+    try {
+      const scrollSpy = jest.spyOn(ScrollView.prototype, 'scrollToEnd').mockImplementation(() => undefined);
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+      await render(
+        <QueryClientProvider client={client}>
+          <ProfileScreen />
+        </QueryClientProvider>,
+      );
+      const hasHandledTaps = (node: unknown): boolean => {
+        if (!node || typeof node !== 'object') return false;
+        if (Array.isArray(node)) return node.some(hasHandledTaps);
+        const n = node as { props?: Record<string, unknown>; children?: unknown };
+        return n.props?.keyboardShouldPersistTaps === 'handled' || hasHandledTaps(n.children);
+      };
+      expect(hasHandledTaps(screen.toJSON())).toBe(true);
+      await fireEvent.press(await screen.findByLabelText('Delete account'));
+      await fireEvent(await screen.findByLabelText('Your password'), 'focus');
+      await act(async () => {
+        jest.advanceTimersByTime(150);
+      });
+      expect(scrollSpy).toHaveBeenCalledWith({ animated: true });
+      scrollSpy.mockRestore();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('signs out, clears the cache and goes to sign-in', async () => {

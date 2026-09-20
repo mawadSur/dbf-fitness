@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { friendlyErrorFromMany } from '../src/components/friendlyError';
 import { MilestoneToast } from '../src/components/MilestoneToast';
 import { useMilestoneCheck } from '../src/features/milestones/useMilestoneCheck';
 import { supabase } from '../src/services/supabase/client';
@@ -115,7 +116,10 @@ export default function CalendarScreen() {
                 className="items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4"
               >
                 <Text accessibilityRole="alert" className="text-center text-sm text-red-700">
-                  Could not load your calendar.
+                  {friendlyErrorFromMany(
+                    [statsQuery.error, historyQuery.error],
+                    'Could not load your calendar.',
+                  )}
                 </Text>
                 <Pressable
                   onPress={handleRefresh}

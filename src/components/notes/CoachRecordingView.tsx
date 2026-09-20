@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useReducer, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Text, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Text, View } from 'react-native';
 
+import { KEYBOARD_AVOIDING_BEHAVIOR } from '../keyboard';
 import { publishNote, retryTranscription, saveEditedContent } from '../../features/notes/api';
 import { editorReducer, initialEditorState, serializeEditor } from '../../features/notes/checklist';
 import { notesKeys } from '../../features/notes/hooks';
@@ -234,7 +235,7 @@ function DraftEditor({ recording, onRefetch }: Props) {
     <KeyboardAvoidingView
       // Android runs edge-to-edge (the window no longer resizes for the keyboard), so it needs an
       // explicit behavior too, or the focused field and the action bar sit under the keyboard.
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={KEYBOARD_AVOIDING_BEHAVIOR}
       style={{ flex: 1 }}
     >
       <View style={{ paddingHorizontal: 16, paddingTop: 8, gap: 4 }}>

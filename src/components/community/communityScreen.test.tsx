@@ -71,7 +71,8 @@ describe('community screen', () => {
 
     await renderWithQuery(<CommunityScreen />);
 
-    expect(await screen.findByText('session lookup failed')).toBeTruthy();
+    expect(await screen.findByText('Could not load your community.')).toBeTruthy();
+    expect(screen.queryByText('session lookup failed')).toBeNull();
     expect(screen.getByText('Try again')).toBeTruthy();
     expect(screen.queryByText('People you train with')).toBeNull();
   });
@@ -94,7 +95,8 @@ describe('community screen', () => {
 
     await renderWithQuery(<CommunityScreen />);
 
-    expect(await screen.findByText('network down')).toBeTruthy();
+    expect(await screen.findByText(/Can't reach the server/)).toBeTruthy();
+    expect(screen.queryByText('network down')).toBeNull();
     expect(screen.getByText('Try again')).toBeTruthy();
   });
 

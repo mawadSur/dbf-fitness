@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { friendlyErrorMessage } from '../../../../src/components/friendlyError';
 import { LiveButton } from '../../../../src/components/live/LiveButton';
 import { SubscriptionBlockedPanel } from '../../../../src/components/live/SubscriptionBlockedPanel';
 import {
@@ -86,7 +87,7 @@ export default function LiveScheduleScreen() {
       ) : isError ? (
         <View className="items-center gap-2">
           <Text className="text-center text-sm text-red-600">
-            {error instanceof Error ? error.message : 'Could not load live classes.'}
+            {friendlyErrorMessage(error, 'Could not load live classes.')}
           </Text>
           <LiveButton label="Try again" variant="secondary" onPress={() => void refetch()} />
         </View>

@@ -1,11 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { KeyboardAvoidingView, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DangerZone } from '../../src/components/account/DangerZone';
 import { useAccount, isStaffRole } from '../../src/components/coaching/useAccount';
 import { CurrentCoachCard } from '../../src/components/coaching/CoachCard';
+import { KEYBOARD_AVOIDING_BEHAVIOR } from '../../src/components/keyboard';
 import { Card, ErrorBlock, LoadingBlock, PrimaryButton } from '../../src/components/coaching/StateBlock';
 import { SubscriptionCard } from '../../src/components/coaching/SubscriptionCard';
 import { useMyCoach } from '../../src/features/coaching/hooks';
@@ -54,6 +56,7 @@ export default function ProfileScreen() {
   const queryClient = useQueryClient();
   const account = useAccount();
   const isMember = account.data?.role === 'member';
+  const scrollRef = useRef<ScrollView>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,8 +94,9 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: '#F8FAFC' }} behavior={KEYBOARD_AVOIDING_BEHAVIOR}>
       <ScrollView
+        ref={scrollRef}
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         contentContainerStyle={{
@@ -130,6 +134,18 @@ export default function ProfileScreen() {
           </Card>
         ) : null}
 
+        {/* Danger zone — in-app account deletion (Apple guideline 5.1.1(v)). Everything it needs
+            lives in src/components/account/; it stays collapsed and inert until tapped, and only
+            renders once the account (and therefore the role) is known. */}
+        {account.data ? (
+          <Card title="Danger zone">
+            <DangerZone
+              role={account.data.role}
+              onFieldFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)}
+            />
+          </Card>
+        ) : null}
+
         <View style={{ gap: 8 }}>
           {signOutError ? (
             <Text accessibilityRole="alert" style={{ color: '#B91C1C', fontSize: 14 }}>
@@ -139,6 +155,6 @@ export default function ProfileScreen() {
           <PrimaryButton label="Sign out" variant="outline" busy={signingOut} onPress={signOut} />
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

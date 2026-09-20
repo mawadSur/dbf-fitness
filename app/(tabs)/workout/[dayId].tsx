@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { friendlyErrorMessage } from '../../../src/components/friendlyError';
 import { ChecklistRow } from '../../../src/components/ChecklistRow';
 import { MilestoneToast } from '../../../src/components/MilestoneToast';
 import { useMilestoneCheck } from '../../../src/features/milestones/useMilestoneCheck';
@@ -179,7 +180,7 @@ export default function WorkoutDayScreen() {
         <BackLink label="‹ Workout" onPress={() => router.back()} />
         <View className="flex-1 items-center justify-center gap-2">
           <Text accessibilityRole="alert" className="text-center text-base text-red-700">
-            {error instanceof Error ? error.message : 'Could not load this workout day.'}
+            {friendlyErrorMessage(error, 'Could not load this workout day.')}
           </Text>
           <Pressable
             onPress={() => refetch()}

@@ -123,6 +123,7 @@ describe('PersonRow', () => {
     const chip = screen.getAllByRole('button').find((node) => node.props.className?.includes('rounded-full'));
     await fireEvent.press(chip!);
     await fireEvent.press(screen.getByLabelText('Send report'));
-    expect(await screen.findByText('rate limited')).toBeTruthy();
+    expect(await screen.findByText('Could not send the report.')).toBeTruthy();
+    expect(screen.queryByText('rate limited')).toBeNull();
   });
 });

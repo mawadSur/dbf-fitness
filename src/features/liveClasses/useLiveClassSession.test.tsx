@@ -81,6 +81,29 @@ describe('useLiveClassSession (mock video adapter)', () => {
     expect(recordJoin).toHaveBeenCalledTimes(1);
   });
 
+  it('dismissGraceNotice backs out to the Join button; the reminder returns on the next join', async () => {
+    (fetchRtcCredentials as jest.Mock).mockResolvedValue(graceCredentials());
+    const { result } = await renderHook(() => useLiveClassSession(CLASS_ID, CHANNEL, MEMBER));
+    await act(async () => {
+      await result.current.join();
+    });
+    await flush();
+    expect(result.current.graceNotice).toEqual(GRACE);
+
+    await act(async () => {
+      result.current.dismissGraceNotice();
+    });
+    expect(result.current.graceNotice).toBeNull();
+    expect(result.current.phase).toBe('idle');
+    expect(recordJoin).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.join();
+    });
+    await flush();
+    expect(result.current.graceNotice).toEqual(GRACE);
+  });
+
   it.each(['subscription_required', 'not_entitled', 'class_not_joinable', 'unauthorized'] as const)(
     'stays out of the call and records the %s denial without attendance',
     async (code) => {

@@ -383,6 +383,13 @@ describe('coach controls', () => {
 });
 
 describe('schedule class form', () => {
+  it('shows friendly copy, not raw text, when the profile fails to load', async () => {
+    (fetchCurrentMember as jest.Mock).mockRejectedValue(new TypeError('Network request failed'));
+    await renderWithQuery(<NewClassScreen />);
+    expect(await screen.findByText("Can't reach the server. Check your connection and try again.")).toBeTruthy();
+    expect(screen.queryByText(/Network request failed/)).toBeNull();
+  });
+
   it('blocks non-coaches', async () => {
     await renderWithQuery(<NewClassScreen />);
     expect(await screen.findByText('Coaches only')).toBeTruthy();

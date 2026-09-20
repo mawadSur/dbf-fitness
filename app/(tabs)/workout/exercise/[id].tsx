@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { supabase } from '../../../../src/services/supabase/client';
+import { friendlyErrorMessage } from '../../../../src/components/friendlyError';
 import { colors } from '../../../../src/theme/tokens';
 
 type ExerciseDetail = {
@@ -67,7 +68,7 @@ export default function ExerciseDetailScreen() {
         <BackLink label="‹ Back" onPress={() => router.back()} />
         <View className="flex-1 items-center justify-center gap-2">
           <Text accessibilityRole="alert" className="text-center text-base text-red-700">
-            {error instanceof Error ? error.message : 'Could not load this exercise.'}
+            {friendlyErrorMessage(error, 'Could not load this exercise.')}
           </Text>
           <Pressable
             onPress={() => refetch()}

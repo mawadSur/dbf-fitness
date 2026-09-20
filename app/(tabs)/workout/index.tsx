@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { supabase } from '../../../src/services/supabase/client';
+import { friendlyErrorMessage } from '../../../src/components/friendlyError';
 import { colors } from '../../../src/theme/tokens';
 
 type WorkoutDayRow = {
@@ -129,7 +130,7 @@ export default function WorkoutScreen() {
         refreshControl={refreshControl}
       >
         <Text accessibilityRole="alert" className="text-center text-base text-red-700">
-          {error instanceof Error ? error.message : 'Could not load your workout plan.'}
+          {friendlyErrorMessage(error, 'Could not load your workout plan.')}
         </Text>
         <Pressable
           onPress={() => refetch()}

@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { KEYBOARD_AVOIDING_BEHAVIOR } from '../../../src/components/keyboard';
+import { friendlyErrorMessage } from '../../../src/components/friendlyError';
 import { GroupRosterSection } from '../../../src/components/community/GroupRosterSection';
 import { GroupRow } from '../../../src/components/community/GroupRow';
 import { NoticeBanner, type Notice } from '../../../src/components/community/NoticeBanner';
@@ -20,9 +22,6 @@ import { useListScrollIntoView } from '../../../src/components/community/useList
 import { fetchGroups, getMemberId } from '../../../src/features/community/api';
 import { splitGroups } from '../../../src/features/community/groups';
 import { buildCommunityItems, type CommunityItem } from '../../../src/features/community/screenItems';
-
-/** 'padding' on both platforms: edge-to-edge Android no longer resizes the window for the keyboard. */
-const KEYBOARD_BEHAVIOR = 'padding' as const;
 
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
@@ -121,7 +120,7 @@ export default function CommunityScreen() {
       ) : loadError ? (
         <View className="items-center gap-2">
           <Text accessibilityRole="alert" className="text-center text-sm text-red-700">
-            {loadError instanceof Error ? loadError.message : 'Could not load your community.'}
+            {friendlyErrorMessage(loadError, 'Could not load your community.')}
           </Text>
           <Pressable
             onPress={retry}
@@ -138,7 +137,7 @@ export default function CommunityScreen() {
 
   return (
     <ScrollIntoViewContext.Provider value={scrollIntoView}>
-      <KeyboardAvoidingView className="flex-1 bg-white" behavior={KEYBOARD_BEHAVIOR}>
+      <KeyboardAvoidingView className="flex-1 bg-white" behavior={KEYBOARD_AVOIDING_BEHAVIOR}>
         <FlatList
           ref={listRef}
           testID="community-list"

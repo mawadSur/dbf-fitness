@@ -254,10 +254,12 @@ select is((select count(*)::int from public.milestones
           'coach B reads no milestone rows for coach A member');                           -- 40
 
 -- ===========================================================================
--- Admin. NOTE: profiles lets an admin see every member, but
--- workout_completions_select_owner does NOT have an admin branch, so the view
--- hands an admin a row of zeros rather than either the truth or a refusal.
--- These two assertions record that live behaviour so a later change is loud.
+-- Admin. profiles has an admin branch and, since 20260919154100, so does
+-- workout_completions (policy workout_completions_select_admin). The view is
+-- security_invoker, so an admin now reads the TRUTH rather than a row of zeros
+-- that looked like data while has_earned_milestone said otherwise.
+-- Assertion 42 is the anchor: drop workout_completions_select_admin and it goes
+-- back to 0 and this suite turns RED.
 -- ===========================================================================
 select set_config('request.jwt.claim.sub', '7a120000-0000-4000-8000-000000000007', true);
 
@@ -265,11 +267,11 @@ select is((select count(*)::int from public.member_workout_stats
             where member_id = '7a120000-0000-4000-8000-000000000002'), 1,
           'admin: the stats row for any member is visible (profiles has an admin branch)');-- 41
 select is((select completed_count from public.member_workout_stats
-            where member_id = '7a120000-0000-4000-8000-000000000002'), 0::bigint,
-          'admin: but completed_count reads 0 -- workout_completions has no admin branch'); -- 42
+            where member_id = '7a120000-0000-4000-8000-000000000002'), 8::bigint,
+          'admin: completed_count is the real 8 -- workout_completions_select_admin');     -- 42
 select is(public.has_earned_milestone('7a120000-0000-4000-8000-000000000002', 'first_day'),
           true,
-          'admin: the SECURITY DEFINER milestone RPC still answers true (the mismatch)');  -- 43
+          'admin: the SECURITY DEFINER milestone RPC agrees (no view/RPC mismatch left)'); -- 43
 
 -- ===========================================================================
 -- Stranger.

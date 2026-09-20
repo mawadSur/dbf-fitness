@@ -9,10 +9,13 @@ import { LiveButton } from './LiveButton';
 export function GraceNotice({
   info,
   onJoinAnyway,
+  onDismiss,
   joining = false,
 }: {
   info: SubscriptionInfo;
   onJoinAnyway: () => void;
+  /** Back out to the Join button without joining. */
+  onDismiss?: () => void;
   joining?: boolean;
 }) {
   const copy = graceReminderCopy(info);
@@ -41,6 +44,9 @@ export function GraceNotice({
         onPress={onJoinAnyway}
         busy={joining}
       />
+      {onDismiss ? (
+        <LiveButton label="Not now" variant="ghost" onPress={onDismiss} disabled={joining} />
+      ) : null}
     </View>
   );
 }

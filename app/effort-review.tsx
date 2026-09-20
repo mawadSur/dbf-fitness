@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { supabase } from '../src/services/supabase/client';
+import { friendlyErrorMessage } from '../src/components/friendlyError';
 import { colors } from '../src/theme/tokens';
 
 const SCORE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -161,9 +162,7 @@ export default function EffortReviewScreen() {
         <BackLink onPress={goBack} />
         <View className="flex-1 items-center justify-center gap-2">
           <Text accessibilityRole="alert" className="text-center text-base text-red-700">
-            {accessQuery.error instanceof Error
-              ? accessQuery.error.message
-              : 'Could not check your access.'}
+            {friendlyErrorMessage(accessQuery.error, 'Could not check your access.')}
           </Text>
           <RetryButton onPress={() => accessQuery.refetch()} />
         </View>
@@ -211,9 +210,7 @@ export default function EffortReviewScreen() {
         ) : completionsQuery.isError ? (
           <View className="items-center gap-2">
             <Text accessibilityRole="alert" className="text-center text-sm text-red-700">
-              {completionsQuery.error instanceof Error
-                ? completionsQuery.error.message
-                : 'Could not load completions.'}
+              {friendlyErrorMessage(completionsQuery.error, 'Could not load completions.')}
             </Text>
             <RetryButton onPress={() => completionsQuery.refetch()} />
           </View>
@@ -228,9 +225,7 @@ export default function EffortReviewScreen() {
             accessibilityLiveRegion="polite"
             className="pt-3 text-center text-sm text-red-700"
           >
-            {scoreMutation.error instanceof Error
-              ? scoreMutation.error.message
-              : 'Could not save that score.'}
+            {friendlyErrorMessage(scoreMutation.error, 'Could not save that score.')}
           </Text>
         ) : null
       }

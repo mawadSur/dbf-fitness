@@ -12,10 +12,10 @@ export const colors = {
 } as const;
 
 export const milestoneTiers = {
-  // Used as TEXT (toast label) as well as border: must be the AA-safe #047857 (= colors.primaryStrong).
+  // All tier colors are used as TEXT (toast label) as well as border: each must be >= 4.5:1 on white.
   firstDay: { label: 'First Day', color: '#047857' },
   sevenDayStreak: { label: '7-Day Streak', color: '#2563EB' },
-  thirtyDayStreak: { label: '30-Day Streak', color: '#D97706' },
+  thirtyDayStreak: { label: '30-Day Streak', color: '#B45309' },
 } as const;
 
 export type MilestoneTier = keyof typeof milestoneTiers;

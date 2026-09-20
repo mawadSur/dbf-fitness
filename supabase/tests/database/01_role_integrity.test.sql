@@ -1524,12 +1524,32 @@ select is(
   0::bigint,
   'R3-4 the view does NOT leak another coach''s recording (security_invoker RLS holds)');
 
+-- 20260919154100 hardened this further: anon no longer holds SELECT on the view at all
+-- (it used to hold SELECT plus the INSERT/UPDATE/DELETE that CREATE VIEW picked up from
+-- Supabase's default privileges). "anon reads nothing" is now enforced by the grant, not
+-- only by RLS, so assert both the privilege and the runtime refusal.
+select ok(
+  not has_table_privilege('anon', 'public.recordings_client', 'SELECT'),
+  'R3-4 anon holds no SELECT privilege on the view (20260919154100 revoked it)');
+
+select ok(
+  not exists (
+    select 1 from information_schema.role_table_grants
+     where table_schema = 'public' and table_name = 'recordings_client'
+       and grantee in ('anon', 'authenticated')
+       and privilege_type in ('INSERT', 'UPDATE', 'DELETE', 'TRUNCATE')),
+  'R3-4 no client role holds a write privilege on the auto-updatable view');
+
+select ok(
+  has_table_privilege('authenticated', 'public.recordings_client', 'SELECT'),
+  'R3-4 authenticated keeps SELECT on the view (RLS still decides which rows)');
+
 set local role anon;
 select set_config('request.jwt.claim.sub', '', true);
-select is(
-  (select count(*) from public.recordings_client),
-  0::bigint,
-  'R3-4 anon reads nothing through the view');
+select throws_ok(
+  $$ select count(*) from public.recordings_client $$,
+  '42501', null,
+  'R3-4 anon reads nothing through the view: the select is refused outright');
 
 
 -- ---------------------------------------------------------------------------

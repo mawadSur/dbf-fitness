@@ -7,9 +7,17 @@ import SignUpScreen from '../../../app/(auth)/sign-up';
 import { fakeCalls, fakeSupabase, resetFake, setTable } from './fakeSupabase';
 
 const mockReplace = jest.fn();
+const mockSetParams = jest.fn();
+let mockParams: Record<string, string | undefined> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace, push: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({
+    replace: mockReplace,
+    push: jest.fn(),
+    back: jest.fn(),
+    setParams: mockSetParams,
+  }),
+  useLocalSearchParams: () => mockParams,
   Link: ({ children, ...rest }: { children: React.ReactNode }) => {
     return <MockText {...rest}>{children}</MockText>;
   },
@@ -35,6 +43,7 @@ async function renderScreen(ui: React.ReactElement) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockParams = {};
   resetFake();
 });
 
@@ -103,6 +112,32 @@ describe('SignInScreen', () => {
     expect(alert).toHaveTextContent('Invalid login credentials');
     expect(alert.props.accessibilityLiveRegion).toBe('polite');
     expect(mockReplace).not.toHaveBeenCalled();
+  });
+});
+
+describe('SignInScreen deleted-account notice', () => {
+  it('shows nothing without the param', async () => {
+    await renderScreen(<SignInScreen />);
+    expect(screen.queryByText('Your account was deleted.')).toBeNull();
+    expect(mockSetParams).not.toHaveBeenCalled();
+  });
+
+  it('shows a dismissible live-region alert for ?deleted=1 and clears the param', async () => {
+    mockParams = { deleted: '1' };
+    await renderScreen(<SignInScreen />);
+    const alert = screen.getByText('Your account was deleted.').parent!;
+    expect(alert.props.accessibilityRole).toBe('alert');
+    expect(alert.props.accessibilityLiveRegion).toBe('polite');
+    await waitFor(() => expect(mockSetParams).toHaveBeenCalledWith({ deleted: undefined }));
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Dismiss notice' }));
+    expect(screen.queryByText('Your account was deleted.')).toBeNull();
+  });
+
+  it('ignores other values of the param', async () => {
+    mockParams = { deleted: '0' };
+    await renderScreen(<SignInScreen />);
+    expect(screen.queryByText('Your account was deleted.')).toBeNull();
   });
 });
 

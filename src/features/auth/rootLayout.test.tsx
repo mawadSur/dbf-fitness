@@ -8,8 +8,11 @@ import { bindAuthAutoRefresh } from '../../services/supabase/autoRefresh';
 import { supabase } from '../../services/supabase/client';
 import * as SplashScreen from 'expo-splash-screen';
 
-const mockReplace = jest.fn();
-let mockSegments: string[] = [];
+// The layout must not touch the router at all: it uses declarative route guards. The expo-router
+// mock therefore exports NO useRouter/useSegments/router — if the imperative redirect-in-effect
+// (the bug that logged "Can't perform a React state update on a component that hasn't mounted yet")
+// ever comes back, the layout throws on the missing export and these tests go red.
+const mockGuards: boolean[] = [];
 
 jest.mock('../../../global.css', () => ({}));
 jest.mock('expo-router', () => {
@@ -18,10 +21,15 @@ jest.mock('expo-router', () => {
   function Stack({ children }: { children?: unknown }) {
     return <View testID="stack">{children as never}</View>;
   }
-  Stack.Screen = function Screen() {
-    return null;
+  Stack.Screen = function Screen({ name }: { name: string }) {
+    return <View testID={`screen-${name}`} />;
   };
-  return { Stack, useRouter: () => ({ replace: mockReplace }), useSegments: () => mockSegments };
+  // Mirrors expo-router: children of a guarded-out <Stack.Protected> are not registered.
+  Stack.Protected = function Protected({ guard, children }: { guard: boolean; children?: unknown }) {
+    mockGuards.push(guard);
+    return guard ? (children as never) : null;
+  };
+  return { Stack };
 });
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
 jest.mock('expo-splash-screen', () => ({
@@ -48,7 +56,7 @@ function setOS(os: string) {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers();
-  mockSegments = [];
+  mockGuards.length = 0;
   setOS('ios');
   onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe } } });
 });
@@ -66,39 +74,63 @@ describe('RootLayout session gate', () => {
     await render(<RootLayout />);
     expect(screen.queryByTestId('stack')).toBeNull();
     expect(hideAsync).not.toHaveBeenCalled();
-    expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('shows the stack, hides the splash and sends a signed-out user to sign-in', async () => {
+  it('shows the stack, hides the splash and exposes only the auth screens to a signed-out user', async () => {
     getSession.mockResolvedValue({ data: { session: null } });
     await render(<RootLayout />);
     expect(await screen.findByTestId('stack')).toBeTruthy();
     expect(hideAsync).toHaveBeenCalled();
-    expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
+    expect(screen.getByTestId('screen-(auth)')).toBeTruthy();
+    expect(screen.queryByTestId('screen-(tabs)')).toBeNull();
+    expect(screen.queryByTestId('screen-calendar')).toBeNull();
   });
 
-  it('sends a signed-in user out of the auth group to the tabs', async () => {
-    mockSegments = ['(auth)'];
+  it('exposes only the signed-in screens (never (auth)) to a signed-in user', async () => {
     getSession.mockResolvedValue({ data: { session: SESSION } });
     await render(<RootLayout />);
     await screen.findByTestId('stack');
-    expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
+    for (const name of [
+      '(tabs)',
+      'calendar',
+      'effort',
+      'effort-review',
+      'notes/index',
+      'notes/upload',
+      'notes/[recordingId]',
+      'coach/pick',
+      'coach/profile',
+    ]) {
+      expect(screen.getByTestId(`screen-${name}`)).toBeTruthy();
+    }
+    expect(screen.queryByTestId('screen-(auth)')).toBeNull();
   });
 
-  it('does not redirect a signed-in user who is already in the app', async () => {
-    mockSegments = ['(tabs)'];
-    getSession.mockResolvedValue({ data: { session: SESSION } });
+  it('never mounts the guards before the session resolves (nothing can navigate an unmounted navigator)', async () => {
+    getSession.mockReturnValue(new Promise(() => undefined));
     await render(<RootLayout />);
-    await screen.findByTestId('stack');
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('stack')).toBeNull();
+    expect(mockGuards).toEqual([]);
   });
 
-  it('does not redirect a signed-out user already on the auth screens', async () => {
-    mockSegments = ['(auth)'];
+  it('flips the guards when the session changes: sign-in swaps to the app, sign-out back to (auth)', async () => {
     getSession.mockResolvedValue({ data: { session: null } });
     await render(<RootLayout />);
     await screen.findByTestId('stack');
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.getByTestId('screen-(auth)')).toBeTruthy();
+
+    const listener = onAuthStateChange.mock.calls[0][0];
+    await act(async () => {
+      listener('SIGNED_IN', SESSION);
+    });
+    expect(screen.getByTestId('screen-(tabs)')).toBeTruthy();
+    expect(screen.queryByTestId('screen-(auth)')).toBeNull();
+
+    await act(async () => {
+      listener('SIGNED_OUT', null);
+    });
+    expect(screen.getByTestId('screen-(auth)')).toBeTruthy();
+    expect(screen.queryByTestId('screen-(tabs)')).toBeNull();
   });
 
   it('releases the splash and falls through to sign-in when getSession rejects', async () => {
@@ -106,7 +138,7 @@ describe('RootLayout session gate', () => {
     await render(<RootLayout />);
     expect(await screen.findByTestId('stack')).toBeTruthy();
     expect(hideAsync).toHaveBeenCalled();
-    expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
+    expect(screen.getByTestId('screen-(auth)')).toBeTruthy();
   });
 
   it('releases the splash after a timeout when getSession never resolves', async () => {
@@ -118,7 +150,7 @@ describe('RootLayout session gate', () => {
     });
     expect(await screen.findByTestId('stack')).toBeTruthy();
     expect(hideAsync).toHaveBeenCalled();
-    expect(mockReplace).toHaveBeenCalledWith('/(auth)/sign-in');
+    expect(screen.getByTestId('screen-(auth)')).toBeTruthy();
   });
 
   it('becomes ready from an auth state change even if getSession is still pending', async () => {

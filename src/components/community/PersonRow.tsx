@@ -10,6 +10,7 @@ import {
   type ReportReason,
 } from '../../features/community/reportReasons';
 import { initialsOf, type RosterEntry } from '../../features/community/roster';
+import { friendlyErrorMessage } from '../friendlyError';
 import { colors } from '../../theme/tokens';
 import type { Notice } from './NoticeBanner';
 import { useScrollIntoView } from './ScrollIntoView';
@@ -22,7 +23,7 @@ type PersonRowProps = {
 };
 
 function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  return friendlyErrorMessage(error, fallback);
 }
 
 export function PersonRow({ entry, onNotice }: PersonRowProps) {

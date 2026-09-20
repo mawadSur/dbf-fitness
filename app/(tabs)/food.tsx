@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { friendlyErrorMessage } from '../../src/components/friendlyError';
 import { ChecklistRow } from '../../src/components/ChecklistRow';
 import { todayDateString as computeTodayDateString } from '../../src/features/diet/dates';
 import { supabase } from '../../src/services/supabase/client';
@@ -173,9 +174,7 @@ export default function FoodScreen() {
         refreshControl={refreshControl}
       >
         <Text accessibilityRole="alert" className="text-center text-base text-red-700">
-          {planQuery.error instanceof Error
-            ? planQuery.error.message
-            : 'Could not load your diet plan.'}
+          {friendlyErrorMessage(planQuery.error, 'Could not load your diet plan.')}
         </Text>
         <Pressable
           onPress={() => planQuery.refetch()}
@@ -240,7 +239,10 @@ export default function FoodScreen() {
         <>
           {checkinsQuery.isError ? (
             <Text accessibilityRole="alert" className="pt-3 text-center text-sm text-red-700">
-              Could not load today&apos;s check-ins. Pull down to retry.
+              {friendlyErrorMessage(
+                checkinsQuery.error,
+                "Could not load today's check-ins. Pull down to retry."
+              )}
             </Text>
           ) : null}
           {toggleMutation.isError ? (
@@ -249,9 +251,7 @@ export default function FoodScreen() {
               accessibilityLiveRegion="polite"
               className="pt-3 text-center text-sm text-red-700"
             >
-              {toggleMutation.error instanceof Error
-                ? toggleMutation.error.message
-                : 'Could not save that change.'}
+              {friendlyErrorMessage(toggleMutation.error, 'Could not save that change.')}
             </Text>
           ) : null}
         </>

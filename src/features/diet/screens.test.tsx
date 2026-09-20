@@ -37,7 +37,13 @@ jest.mock('expo-router', () => ({
 jest.mock('../../services/supabase/client', () => ({
   supabase: jest.requireActual('./fakeSupabase').fakeSupabase,
 }));
-jest.mock('../coaching', () => ({ useMyCoach: () => mockMyCoach }));
+const mockMyCoachOptions: ({ enabled?: boolean } | undefined)[] = [];
+jest.mock('../coaching', () => ({
+  useMyCoach: (options?: { enabled?: boolean }) => {
+    mockMyCoachOptions.push(options);
+    return mockMyCoach;
+  },
+}));
 jest.mock('../milestones/useMilestoneCheck', () => ({
   useMilestoneCheck: () => ({ newlyAchievedTier: null, isLoading: false }),
 }));
@@ -63,6 +69,7 @@ const fail = (message: string) => ({ data: null, error: new Error(message) });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockMyCoachOptions.length = 0;
   resetFake();
   mockCanGoBack = true;
   mockParams = {};
@@ -98,6 +105,22 @@ describe('HomeScreen coach nudge', () => {
     await renderScreen(<HomeScreen />);
     await screen.findByText('Hi, Sam');
     expect(screen.queryByRole('button', { name: 'Pick your coach' })).toBeNull();
+  });
+
+  it.each(['coach', 'admin'] as const)('never asks for a coach on behalf of a %s', async (role) => {
+    seedHome(role);
+    await renderScreen(<HomeScreen />);
+    await screen.findByText('Hi, Sam');
+    expect(mockMyCoachOptions.length).toBeGreaterThan(0);
+    expect(mockMyCoachOptions.every((o) => o?.enabled === false)).toBe(true);
+  });
+
+  it('enables the coach lookup only once the profile says member', async () => {
+    seedHome('member');
+    await renderScreen(<HomeScreen />);
+    await screen.findByText('Hi, Sam');
+    expect(mockMyCoachOptions[0]?.enabled).toBe(false);
+    expect(mockMyCoachOptions[mockMyCoachOptions.length - 1]?.enabled).toBe(true);
   });
 
   it.each(['coach', 'admin'] as const)('never shows the nudge to a %s', async (role) => {
@@ -221,6 +244,61 @@ describe('FoodScreen', () => {
     });
   });
 
+  it('check-ins load failure shows friendly network copy, not the raw text', async () => {
+    seedFood();
+    setTable('diet_checkins', () => ({
+      data: null,
+      error: new TypeError('Network request failed'),
+    }));
+    await renderScreen(<FoodScreen />);
+
+    expect(
+      await screen.findByText("Can't reach the server. Check your connection and try again.")
+    ).toBeTruthy();
+    expect(screen.queryByText(/Network request failed/)).toBeNull();
+  });
+
+  it('check-ins load failure with an unclassified error shows the screen fallback', async () => {
+    seedFood();
+    setTable('diet_checkins', () => fail('boom'));
+    await renderScreen(<FoodScreen />);
+
+    expect(
+      await screen.findByText("Could not load today's check-ins. Pull down to retry.")
+    ).toBeTruthy();
+    expect(screen.queryByText('boom')).toBeNull();
+  });
+
+  it('toggle failure shows friendly network copy, not the raw text', async () => {
+    seedFood();
+    setTable('diet_checkins', (ops) =>
+      ops.method === 'select'
+        ? ok([{ diet_item_id: 'i1' }])
+        : { data: null, error: new TypeError('Network request failed') }
+    );
+    await renderScreen(<FoodScreen />);
+    await screen.findByText('Lean Plan');
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Chicken' }));
+
+    expect(
+      await screen.findByText("Can't reach the server. Check your connection and try again.")
+    ).toBeTruthy();
+    expect(screen.queryByText(/Network request failed/)).toBeNull();
+  });
+
+  it('toggle failure with an unclassified error shows the screen fallback', async () => {
+    seedFood();
+    setTable('diet_checkins', (ops) =>
+      ops.method === 'select' ? ok([{ diet_item_id: 'i1' }]) : fail('boom')
+    );
+    await renderScreen(<FoodScreen />);
+    await screen.findByText('Lean Plan');
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Chicken' }));
+
+    expect(await screen.findByText('Could not save that change.')).toBeTruthy();
+    expect(screen.queryByText('boom')).toBeNull();
+  });
+
   it('error state offers Try again, which refetches', async () => {
     let attempts = 0;
     setTable('diet_plan_assignments', () => {
@@ -230,7 +308,8 @@ describe('FoodScreen', () => {
     setTable('diet_checkins', () => ok([]));
     await renderScreen(<FoodScreen />);
 
-    expect(await screen.findByText('boom')).toBeTruthy();
+    expect(await screen.findByText('Could not load your diet plan.')).toBeTruthy();
+    expect(screen.queryByText('boom')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText(/No diet plan assigned yet/)).toBeTruthy();
     expect(attempts).toBe(2);
@@ -277,7 +356,8 @@ describe('WorkoutScreen', () => {
       return attempts === 1 ? fail('nope') : ok(null);
     });
     await renderScreen(<WorkoutScreen />);
-    expect(await screen.findByText('nope')).toBeTruthy();
+    expect(await screen.findByText('Could not load your workout plan.')).toBeTruthy();
+    expect(screen.queryByText('nope')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText(/hasn't assigned a workout plan/)).toBeTruthy();
   });
@@ -288,7 +368,8 @@ describe('Workout day and exercise error states', () => {
     mockParams = { dayId: 'd1' };
     setTable('workout_days', () => fail('day failed'));
     await renderScreen(<WorkoutDayScreen />);
-    expect(await screen.findByText('day failed')).toBeTruthy();
+    expect(await screen.findByText('Could not load this workout day.')).toBeTruthy();
+    expect(screen.queryByText('day failed')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Go back' }));
     expect(mockBack).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
@@ -336,7 +417,8 @@ describe('Workout day and exercise error states', () => {
     mockParams = { id: 'e1' };
     setTable('exercises', () => fail('ex failed'));
     await renderScreen(<ExerciseDetailScreen />);
-    expect(await screen.findByText('ex failed')).toBeTruthy();
+    expect(await screen.findByText('Could not load this exercise.')).toBeTruthy();
+    expect(screen.queryByText('ex failed')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Go back' }));
     expect(mockBack).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
@@ -398,7 +480,8 @@ describe('EffortScreen', () => {
       return attempts === 1 ? fail('stats down') : ok([]);
     });
     await renderScreen(<EffortScreen />);
-    expect(await screen.findByText('stats down')).toBeTruthy();
+    expect(await screen.findByText('Could not load effort data.')).toBeTruthy();
+    expect(screen.queryByText('stats down')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByText('No effort data yet.')).toBeTruthy();
   });

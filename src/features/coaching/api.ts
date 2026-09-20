@@ -33,6 +33,11 @@ export function mapChooseCoachError(error: unknown): ChooseCoachError {
     if (known) return new ChooseCoachError(known);
     return new ChooseCoachError('unknown', message);
   }
+  // 22P02 invalid_text_representation: PostgreSQL rejects a malformed uuid while COERCING the
+  // rpc argument, so choose_coach()'s body never runs and never raises its own P0001. The user
+  // handed us an id that names no coach, which is exactly what coach_not_found means — surfacing
+  // "something went wrong" instead would be a worse answer for the same situation.
+  if (e.code === '22P02') return new ChooseCoachError('coach_not_found', message);
   if (
     error instanceof TypeError ||
     /network|fetch|timed? ?out|offline|connection/i.test(message)

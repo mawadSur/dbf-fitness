@@ -144,8 +144,8 @@ select is(
       and p.prosecdef
       and p.prorettype <> 'trigger'::regtype
       and p.proname <> 'apply_realtime_presence_policies'),
-  array['can_join_group', 'can_join_live_class', 'can_manage_recording', 'can_read_published_notes', 'can_read_workout_note', 'can_see_live_class', 'can_use_group_presence_topic', 'can_use_live_class_presence_topic', 'can_use_presence_topic', 'choose_coach', 'get_group_roster', 'get_my_coach', 'get_subscription_state', 'has_earned_milestone', 'has_live_access', 'is_admin', 'is_assigned_diet_item', 'is_coach_of_diet_plan', 'is_coach_of_member', 'is_coach_of_workout_day', 'is_coach_or_admin', 'is_fellow_group_member', 'is_member_of_diet_plan', 'list_coaches', 'live_class_exists', 'owns_workout_day', 'recording_coach_id', 'subscription_state_row']::text[],
-  'sweep: the catalog holds exactly the 28 definers the sweep list names (a rename fails here)');
+  array['can_join_group', 'can_join_live_class', 'can_manage_recording', 'can_read_published_notes', 'can_read_workout_note', 'can_see_live_class', 'can_use_group_presence_topic', 'can_use_live_class_presence_topic', 'can_use_presence_topic', 'choose_coach', 'get_group_roster', 'get_my_coach', 'get_subscription_state', 'has_earned_milestone', 'has_live_access', 'is_admin', 'is_assigned_diet_item', 'is_blocked_pair', 'is_coach_of_diet_plan', 'is_coach_of_member', 'is_coach_of_workout_day', 'is_coach_or_admin', 'is_fellow_group_member', 'is_member_of_diet_plan', 'list_coaches', 'live_class_exists', 'owns_workout_day', 'recording_coach_id', 'subscription_state_row']::text[],
+  'sweep: the catalog holds exactly the 29 definers the sweep list names (a rename fails here)');
 
 set local role anon;
 select set_config('request.jwt.claim.sub', '', true);
@@ -170,6 +170,7 @@ declare
     'public.has_live_access(null::uuid)',
     'public.is_admin(null::uuid)',
     'public.is_assigned_diet_item(null::uuid)',
+    'public.is_blocked_pair(null::uuid)',
     'public.is_coach_of_diet_plan(null::uuid)',
     'public.is_coach_of_member(null::uuid)',
     'public.is_coach_of_workout_day(null::uuid)',
@@ -205,8 +206,8 @@ begin
 end
 $sweep$;
 
-select is(current_setting('app.s11_sweep_n')::int, 84,
-          'sweep: 28 definers x 3 calls each completed as anon');
+select is(current_setting('app.s11_sweep_n')::int, 87,
+          'sweep: 29 definers x 3 calls each completed as anon');
 select is(current_setting('app.s11_sweep_bad'),
           'public.choose_coach(null::uuid)',
           'sweep: the only definer that raises for anon is choose_coach (not_authenticated)');

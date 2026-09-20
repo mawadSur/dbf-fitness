@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { joinGroup, leaveGroup } from '../../features/community/api';
 import type { Group } from '../../features/community/groups';
+import { friendlyErrorMessage } from '../friendlyError';
 import type { Notice } from './NoticeBanner';
 
 type GroupRowProps = {
@@ -22,7 +23,7 @@ export function GroupRow({ group, isMember, onNotice }: GroupRowProps) {
     },
     onError: (error) => {
       const fallback = isMember ? `Could not leave ${group.name}.` : `Could not join ${group.name}.`;
-      onNotice({ tone: 'error', text: error instanceof Error ? error.message : fallback });
+      onNotice({ tone: 'error', text: friendlyErrorMessage(error, fallback) });
     },
   });
 

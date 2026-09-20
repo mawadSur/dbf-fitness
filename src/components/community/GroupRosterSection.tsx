@@ -6,6 +6,7 @@ import { fetchRoster } from '../../features/community/api';
 import type { Group } from '../../features/community/groups';
 import { mergeRosterWithPresence } from '../../features/community/roster';
 import { useGroupPresence } from '../../features/community/useGroupPresence';
+import { friendlyErrorMessage } from '../friendlyError';
 import type { Notice } from './NoticeBanner';
 import { PersonRow } from './PersonRow';
 
@@ -46,7 +47,7 @@ export function GroupRosterSection({ group, userId, onNotice }: GroupRosterSecti
       ) : rosterQuery.isError ? (
         <View className="items-start gap-2">
           <Text accessibilityRole="alert" className="text-sm text-red-700">
-            {rosterQuery.error instanceof Error ? rosterQuery.error.message : 'Could not load this group.'}
+            {friendlyErrorMessage(rosterQuery.error, 'Could not load this group.')}
           </Text>
           <Pressable
             onPress={() => void rosterQuery.refetch()}

@@ -3,6 +3,8 @@ import { useRef, useState } from 'react';
 import { Keyboard, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { friendlyErrorMessage } from '../friendlyError';
+import { KEYBOARD_AVOIDING_BEHAVIOR } from '../keyboard';
 import { createLiveClass, type LiveClass } from '../../features/liveClasses/api';
 import {
   quickPicks,
@@ -13,8 +15,6 @@ import {
 import { LiveButton } from './LiveButton';
 
 export const FORM_BOTTOM_PADDING = 24;
-/** Explicit on both platforms: edge-to-edge Android no longer resizes the window for the keyboard. */
-export const KEYBOARD_AVOIDING_BEHAVIOR = 'padding' as const;
 const INPUT =
   'min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900';
 
@@ -158,7 +158,7 @@ export function ScheduleClassForm({
 
           {create.isError ? (
             <Text className="text-sm text-red-700">
-              {create.error instanceof Error ? create.error.message : 'Could not schedule the class.'}
+              {friendlyErrorMessage(create.error, 'Could not schedule the class.')}
             </Text>
           ) : null}
 

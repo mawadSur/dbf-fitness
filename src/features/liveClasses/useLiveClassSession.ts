@@ -165,5 +165,21 @@ export function useLiveClassSession(classId: string, channelName: string | null,
   /** Forget a server refusal (e.g. after the member renewed) so Join can be attempted again. */
   const resetDenial = useCallback(() => setDenial(null), []);
 
-  return { phase, tiles, error, denial, joinSubscription, graceNotice, join, leave, toggleMute, toggleCamera, resetDenial };
+  /** Back out of the server-reported grace notice to the plain Join button (the notice shows again on the next join). */
+  const dismissGraceNotice = useCallback(() => setGraceNotice(null), []);
+
+  return {
+    phase,
+    tiles,
+    error,
+    denial,
+    joinSubscription,
+    graceNotice,
+    join,
+    leave,
+    toggleMute,
+    toggleCamera,
+    resetDenial,
+    dismissGraceNotice,
+  };
 }

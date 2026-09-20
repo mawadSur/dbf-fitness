@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { friendlyErrorMessage } from '../../../../src/components/friendlyError';
 import { CallControlsBar } from '../../../../src/components/live/CallControlsBar';
 import { CoachClassControls } from '../../../../src/components/live/CoachClassControls';
 import { GraceBanner, GraceNotice } from '../../../../src/components/live/GraceNotice';
@@ -112,7 +113,7 @@ export default function LiveClassScreen() {
       <View className="flex-1 gap-4 bg-white px-4" style={topPad}>
         {backButton}
         <Text className="text-center text-sm text-red-600">
-          {loadError instanceof Error ? loadError.message : 'Could not load this class.'}
+          {friendlyErrorMessage(loadError, 'Could not load this class.')}
         </Text>
         <LiveButton
           label="Try again"
@@ -253,6 +254,7 @@ export default function LiveClassScreen() {
                   info={infoFromRtcSubscription(session.graceNotice)}
                   joining={joining}
                   onJoinAnyway={() => void session.join({ graceAcknowledged: true })}
+                  onDismiss={session.dismissGraceNotice}
                 />
               ) : noticeOpen && decision.kind === 'needs-grace-notice' && subscription ? (
                 <GraceNotice
@@ -262,6 +264,7 @@ export default function LiveClassScreen() {
                     setNoticeOpen(false);
                     void session.join({ graceAcknowledged: true });
                   }}
+                  onDismiss={() => setNoticeOpen(false)}
                 />
               ) : (
                 <LiveButton

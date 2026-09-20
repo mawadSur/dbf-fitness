@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } fr
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { supabase } from '../src/services/supabase/client';
+import { friendlyErrorMessage } from '../src/components/friendlyError';
 import { colors } from '../src/theme/tokens';
 
 type LeaderboardRow = {
@@ -135,7 +136,7 @@ export default function EffortScreen() {
           ) : isError ? (
             <View className="items-center gap-2">
               <Text accessibilityRole="alert" className="text-center text-sm text-red-700">
-                {error instanceof Error ? error.message : 'Could not load effort data.'}
+                {friendlyErrorMessage(error, 'Could not load effort data.')}
               </Text>
               <Pressable
                 onPress={() => refetch()}

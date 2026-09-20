@@ -12,6 +12,7 @@ import {
   uploadRecordingHref,
   type CoachAction,
 } from '../../features/liveClasses/coachActions';
+import { friendlyErrorMessage } from '../friendlyError';
 import { LiveButton } from './LiveButton';
 
 const ATTENDEE_REFETCH_MS = 15_000;
@@ -79,7 +80,7 @@ export function CoachClassControls({ liveClass }: { liveClass: LiveClass }) {
 
       {mutation.isError ? (
         <Text className="text-sm text-red-700">
-          {mutation.error instanceof Error ? mutation.error.message : 'Could not update the class.'}
+          {friendlyErrorMessage(mutation.error, 'Could not update the class.')}
         </Text>
       ) : null}
 

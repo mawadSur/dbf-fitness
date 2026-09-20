@@ -133,7 +133,8 @@ describe('live schedule screen', () => {
 
     (fetchUpcomingLiveClasses as jest.Mock).mockRejectedValue(new Error('boom'));
     await renderWithQuery(<ScheduleScreen />);
-    expect(await screen.findByText('boom')).toBeTruthy();
+    expect(await screen.findByText('Could not load live classes.')).toBeTruthy();
+    expect(screen.queryByText('boom')).toBeNull();
   });
 
   it('goes back to the community index', async () => {
@@ -201,6 +202,7 @@ describe('live class screen', () => {
   it('shows an error state', async () => {
     (fetchLiveClass as jest.Mock).mockRejectedValue(new Error('network down'));
     await renderWithQuery(<ClassScreen />);
-    expect(await screen.findByText('network down')).toBeTruthy();
+    expect(await screen.findByText(/Can't reach the server/)).toBeTruthy();
+    expect(screen.queryByText('network down')).toBeNull();
   });
 });
