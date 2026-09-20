@@ -1,3 +1,4 @@
+<!-- /autoplan restore point: /Users/mawad/.gstack/projects/dbf/main-autoplan-restore-20260918-175625.md -->
 # DBF Fitness — Product Plan (Draft v0.2)
 
 Status: scope and key architecture decisions locked with you across two review
@@ -98,21 +99,63 @@ precision on top of a loop that already works without it.
    not deferred bolt-ons.
 7. **Monetization**: bundle + marketplace model (see section 5).
 
-### Still open (small, not blocking a plan review)
+### Resolved in `/autoplan` review
 
-- **Backend**: no existing DBF backend/auth to build on (confirmed
-  greenfield), so this is a build choice — recommend a managed
-  backend-as-a-service (e.g. Supabase or Firebase) to match the React Native
-  choice and avoid standing up custom infra before there are real users.
-  Flag if you'd rather go custom.
-- **Live class video platform**: recommend embedding a managed platform (e.g.
-  Mux, Zoom SDK, Agora) rather than building live streaming — building your
-  own streaming infra is rarely the right v1 call. Flag if you have a
-  preference or existing relationship with a vendor.
+- **Backend**: **Supabase.** Postgres fits the relational data model
+  (workouts, exercises, scores/streaks, community groups) naturally, plus
+  built-in auth, storage for recording uploads, Edge Functions for the async
+  transcription pipeline, and realtime for live-class presence/community.
+- **Live class video platform**: live classes need **two-way video** —
+  participants visible/audible for form-check coaching, not just a
+  broadcast — so **Agora** is the call over Zoom SDK/Mux: it's built for
+  embedded, custom-branded many-to-many RTC (a grid of participants inside
+  the DBF app itself) rather than launching an external client. Recorded
+  sessions (for the upload→notes pipeline) don't need Agora's live RTC path
+  — a simple storage/CDN layer (e.g. Supabase Storage or Mux for VOD
+  transcoding) is enough there.
 
-## 7. Next steps
+## 7. `/autoplan` review findings
 
-This plan is ready for `/autoplan` (or `/plan-eng-review` for architecture
-specifically) to turn sections 4-6 into a reviewed technical plan, or straight
-into scaffolding if you'd rather move fast and iterate. Say the word and I'll
-kick it off.
+**CEO review — HOLD SCOPE, no further expansion.** Every v1 feature now
+serves one loop (train together, never miss a session, get seen for effort);
+pulling community + live classes into v1 and reframing diet/effort-ranking to
+unblock them was the right call. Not recommending more features before v1 —
+the real moat is the recording→notes pipeline (a searchable coaching library
+competitors can't replicate), so transcripts must be treated as a durable
+asset, not pipeline scratch data (see section 5).
+
+**Design review** (gaps to close before build, not blockers to this plan):
+- No defined first-run/onboarding flow (coach assignment, goal-setting,
+  first workout choice).
+- Milestone rewards need a distinct visual/motion treatment per tier
+  (7-day vs. 30-day), not one generic "good job" state.
+- The coach-side recording→notes review screen is underspecified — it's the
+  most distinctive feature in the product and needs its own design pass
+  (draft transcript → checkable list → quick-edit → publish).
+- Community/live discovery IA isn't defined yet — keep it minimal ("people
+  you train with" + presence), not a general social feed/DM system.
+- Accessibility isn't addressed: captions on recorded/live video,
+  screen-reader labels on checklist items, color-independent status states.
+
+**Eng review:**
+- Async pipeline (upload → managed ASR → draft notes → coach review →
+  publish) needs explicit status states (uploading/transcribing/draft/
+  published/failed) surfaced to the coach, and a "processing" UX state on
+  the user side — this is the highest-latency path in the product.
+- Live classes need push (APNs/FCM via Expo Notifications) plus a scheduler
+  firing "starting soon" alerts ahead of class start time.
+- **Flagged gap**: community moderation/safety was noted only as a footnote
+  ("needs thought at build time"). Since community is core loop, not a
+  bolt-on, minimal moderation (report user, coach/mod block) should be an
+  explicit v1 engineering requirement, not deferred.
+
+**DX review — skipped.** The automated scope check matched API/SDK
+references, but every match is a third-party vendor integration (managed ASR
+API, Agora/Zoom/Mux SDKs, HealthKit/Whoop SDKs) — DBF itself exposes no
+developer-facing API, plugin system, or CLI. It's a consumer app; DX review
+doesn't apply here.
+
+## 8. Next steps
+
+Scope, architecture, and the two remaining open items (backend, video
+platform) are now locked. This plan is ready for scaffolding.

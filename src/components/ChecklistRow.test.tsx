@@ -1,0 +1,35 @@
+import { fireEvent, render, screen } from '@testing-library/react-native';
+
+import { ChecklistRow } from './ChecklistRow';
+
+describe('ChecklistRow', () => {
+  it('labels the checkbox with the row label and reflects checked state', async () => {
+    const onToggle = jest.fn();
+    await render(<ChecklistRow label="Squats" sublabel="3x10" checked onToggle={onToggle} />);
+    const box = screen.getByRole('checkbox', { name: 'Squats' });
+    expect(box.props.accessibilityState.checked).toBe(true);
+    expect(box.props.className).toContain('h-11 w-11');
+    await fireEvent.press(box);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('only exposes a details button when onPress is provided', async () => {
+    const onPress = jest.fn();
+    const { rerender } = await render(
+      <ChecklistRow label="Squats" checked={false} onToggle={jest.fn()} />
+    );
+    expect(screen.queryByRole('button')).toBeNull();
+    await rerender(
+      <ChecklistRow label="Squats" checked={false} onToggle={jest.fn()} onPress={onPress} />
+    );
+    await fireEvent.press(screen.getByRole('button', { name: 'Squats, details' }));
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('truncates long labels instead of pushing the layout', async () => {
+    await render(
+      <ChecklistRow label={'Very long name '.repeat(20)} checked={false} onToggle={jest.fn()} />
+    );
+    expect(screen.getByText(/Very long name/).props.numberOfLines).toBe(2);
+  });
+});

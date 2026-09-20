@@ -1,0 +1,56 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": { "simulator": true },
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "http://127.0.0.1:54321",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "REPLACE_WITH_LOCAL_ANON_KEY",
+        "EXPO_PUBLIC_REAL_PUSH": "false"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://REPLACE_STAGING_REF.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "REPLACE_WITH_STAGING_ANON_KEY",
+        "EXPO_PUBLIC_AGORA_APP_ID": "REPLACE_WITH_AGORA_APP_ID",
+        "EXPO_PUBLIC_REAL_PUSH": "true",
+        "EXPO_PUBLIC_EAS_PROJECT_ID": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://REPLACE_PROD_REF.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "REPLACE_WITH_PROD_ANON_KEY",
+        "EXPO_PUBLIC_AGORA_APP_ID": "REPLACE_WITH_AGORA_APP_ID",
+        "EXPO_PUBLIC_REAL_PUSH": "true",
+        "EXPO_PUBLIC_EAS_PROJECT_ID": "REPLACE_WITH_EAS_PROJECT_ID",
+        "EXPO_PUBLIC_BILLING_URL": "https://REPLACE_WITH_BILLING_URL"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "REPLACE_WITH_APPLE_ID_EMAIL",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "REPLACE_WITH_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal"
+      }
+    }
+  }
+}

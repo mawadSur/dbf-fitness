@@ -1,0 +1,51 @@
+// Error copy for the "Finish Workout" action.
+//
+// 20260919152200 scopes workout_completions uniqueness to one row per member, per
+// workout day, per UTC calendar date. Repeating a workout on a LATER date is fine, but
+// tapping Finish twice on the same day now returns Postgres 23505. Without this mapping
+// the screen printed the raw driver text ("duplicate key value violates unique
+// constraint \"workout_completions_member_day_date_key\"") straight at the member.
+
+export const ALREADY_LOGGED_TODAY_MESSAGE =
+  "You've already logged this workout today. Come back tomorrow to keep your streak going.";
+
+export const GENERIC_FINISH_ERROR_MESSAGE = 'Could not finish this workout. Please try again.';
+
+/** Postgres unique_violation. */
+const UNIQUE_VIOLATION = '23505';
+
+function codeOf(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' ? code : null;
+}
+
+function messageOf(error: unknown): string | null {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string') return message;
+  }
+  return null;
+}
+
+/** True when this error is "this member already completed this day today". */
+export function isAlreadyLoggedTodayError(error: unknown): boolean {
+  if (codeOf(error) === UNIQUE_VIOLATION) return true;
+  // PostgREST occasionally surfaces the constraint name without a machine code
+  // (e.g. when the error travels through an RPC wrapper).
+  const message = messageOf(error);
+  return message != null && message.includes('workout_completions_member_day_date_key');
+}
+
+/** Member-facing copy for a failed Finish Workout. Never leaks raw Postgres text. */
+export function describeFinishWorkoutError(error: unknown): string {
+  if (error == null) return GENERIC_FINISH_ERROR_MESSAGE;
+  if (isAlreadyLoggedTodayError(error)) return ALREADY_LOGGED_TODAY_MESSAGE;
+
+  const message = messageOf(error);
+  if (message === 'Not signed in.') return message;
+
+  // Anything else is a server/driver string: show a stable sentence instead.
+  return GENERIC_FINISH_ERROR_MESSAGE;
+}
