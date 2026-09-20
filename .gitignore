@@ -54,3 +54,8 @@ google-play-service-account.json
 *.keystore
 .env.*.local
 supabase/functions/.env
+
+# Local agent / orchestration tooling state (never commit)
+.claude/
+.claude-flow/
+.foreman/
