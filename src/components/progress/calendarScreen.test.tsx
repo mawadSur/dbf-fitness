@@ -94,7 +94,71 @@ describe('CalendarScreen — first load', () => {
     } finally {
       jest.useRealTimers();
     }
+    // Fake timers + a full screen render + the Skeleton pulse push this past
+    // Jest's 5 s default whenever the suite runs in parallel with the rest of
+    // the repo — it failed on `main` for that reason alone, not for anything
+    // the screen does. The budget is generous rather than the assertions weak.
+  }, 30_000);
+});
+
+describe('CalendarScreen — heading hierarchy', () => {
+  /**
+   * The bug: every `accessibilityRole="header"` with no `aria-level` becomes an
+   * `<h1>` on react-native-web, so Calendar shipped three level-1 headings —
+   * "Calendar", the month and the selected day — which is three documents, not
+   * one outline. Levels are asserted on the tree, so the test holds on native too.
+   */
+  /** Every heading in the tree, as `{ text, level }` — level `1` when none is declared. */
+  function headings(): { text: string; level: number }[] {
+    return screen.getAllByRole('header').map((node) => {
+      const props = node.props as Record<string, unknown>;
+      const declared = props['aria-level'];
+      return {
+        text: String(props.children ?? props.accessibilityLabel ?? '').trim(),
+        // react-native-web falls back to `<h1>` when no level is declared, so
+        // "no level" IS level 1 as far as the rendered document is concerned.
+        level: typeof declared === 'number' ? declared : 1,
+      };
+    });
+  }
+
+  it('has exactly one level-1 heading: the screen title', async () => {
+    seed(STATS, [completion('w1', 15, 8)]);
+    await renderScreen(<CalendarScreen />);
+    await screen.findByTestId('month-grid');
+
+    // The screen title is the ScreenHeader's `Heading level={1}`; everything the
+    // calendar itself draws now declares a level BELOW it, so exactly one
+    // heading is left standing at level 1.
+    const atLevelOne = headings().filter((heading) => heading.level === 1);
+    expect(atLevelOne).toHaveLength(1);
+    expect(atLevelOne[0].text).toBe('Calendar');
   });
+
+  it('gives the month title level 2', async () => {
+    seed(STATS, [completion('w1', 15, 8)]);
+    await renderScreen(<CalendarScreen />);
+    await screen.findByTestId('month-grid');
+
+    const title = screen.getByTestId('month-grid-title');
+    expect(title.props.accessibilityRole).toBe('header');
+    expect((title.props as Record<string, unknown>)['aria-level']).toBe(2);
+  });
+
+  it('gives the selected day level 3, under the month', async () => {
+    seed(STATS, [completion('w1', 15, 8)]);
+    await renderScreen(<CalendarScreen />);
+    const grid = await screen.findByTestId('month-grid');
+    expect(grid).toBeTruthy();
+
+    await fireEvent.press(await screen.findByTestId(`day-${dayKey(15)}`));
+
+    const day = await screen.findByTestId('day-detail-title');
+    expect(day.props.accessibilityRole).toBe('header');
+    expect((day.props as Record<string, unknown>)['aria-level']).toBe(3);
+    // One h1, one h2, one h3 — an outline, not three competing documents.
+    expect(headings().map((heading) => heading.level).sort()).toEqual([1, 2, 3]);
+  }, 20_000);
 });
 
 describe('CalendarScreen — success', () => {

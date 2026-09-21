@@ -105,18 +105,26 @@ describe('EffortScreen — loading, empty and offline', () => {
 });
 
 describe('EffortScreen — partial data and refresh', () => {
-  it('a member with no score yet still gets the ring, and says so in words', async () => {
+  it('a member with no score yet gets a dash, NOT a ring reading "0 of 10"', async () => {
     setTable('member_workout_stats', () => ok([stat('a', null)]));
     setTable('profiles', () => ok([{ id: 'a', full_name: 'Alex' }]));
     await renderScreen(<EffortScreen />);
-    expect(await screen.findByTestId('effort-ring')).toBeTruthy();
-    // The ring itself can only say "0 of 10" (its label is built by the shared ui
-    // component), so the written caption underneath is what carries the meaning.
+
+    expect(await screen.findByTestId('effort-unscored')).toBeTruthy();
+    // The regression this guards: an arc at zero next to "No effort score yet"
+    // announced "Average effort 0 of 10" — a measurement of something unmeasured.
+    expect(screen.queryByTestId('effort-ring')).toBeNull();
+    expect(screen.queryByLabelText('Average effort 0 of 10')).toBeNull();
+    expect(screen.queryByText('of 10')).toBeNull();
+
+    expect(screen.getByText('—')).toBeTruthy();
     expect(screen.getByText('No effort score yet')).toBeTruthy();
-    expect(screen.getByLabelText('Average effort 0 of 10')).toBeTruthy();
+    expect(screen.getByLabelText('Average effort: not scored yet')).toBeTruthy();
     expect(
       screen.getByText('Your coach scores the effort once you finish a workout.'),
     ).toBeTruthy();
+    // The rest of the card is unchanged: completed count and streak still show.
+    expect(screen.getByTestId('effort-stats').children).toHaveLength(2);
   });
 
   it('a scored member is not told the average three times over', async () => {
@@ -125,6 +133,8 @@ describe('EffortScreen — partial data and refresh', () => {
     await renderScreen(<EffortScreen />);
 
     expect(await screen.findByLabelText('Average effort 8 of 10')).toBeTruthy();
+    expect(screen.getByTestId('effort-ring')).toBeTruthy();
+    expect(screen.queryByTestId('effort-unscored')).toBeNull();
     expect(screen.queryByText('No effort score yet')).toBeNull();
     // The number lives in the ring only — no "8/10" tile echoing it underneath.
     expect(screen.queryByText('8/10')).toBeNull();

@@ -43,14 +43,23 @@ export function CoachCard({ coach, currentCoachId, onSelect, disabled }: Props) 
         </View>
 
         {/* The selected coach is marked by a check icon and the words "Your coach", never by the
-            soft card tint alone (design system §9). */}
+            soft card tint alone (design system §9).
+
+            "Your coach" used to be an `info` badge: blue text on a blue wash, the only blue in a
+            deep-emerald brand, sitting right beside the green "Accepting members" pill. Two
+            unrelated hues on one row read as two unrelated kinds of fact. It is now the emerald
+            `success` pair — the palette's "this is settled" tone — and it comes FIRST, because
+            once a coach is yours, whether they are taking new members is the lesser fact and
+            drops to `neutral`. */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {state.isCurrent ? (
+            <Badge label="Your coach" tone="success" icon="check-circle" testID="coach-current-badge" />
+          ) : null}
           <Badge
             label={accepting ? 'Accepting members' : 'Not accepting'}
-            tone={accepting ? 'success' : 'neutral'}
+            tone={accepting && !state.isCurrent ? 'success' : 'neutral'}
             icon={accepting ? 'check-circle' : 'lock'}
           />
-          {state.isCurrent ? <Badge label="Your coach" tone="info" icon="check" /> : null}
         </View>
 
         {bio ? (

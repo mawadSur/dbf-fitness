@@ -3,11 +3,12 @@ import { View } from 'react-native';
 import type { LiveClass } from '../../features/liveClasses/api';
 import { STATUS_BADGE } from '../../features/liveClasses/schedule';
 import {
+  formatClassTiming,
   joinBlockedMessage,
   STATUS_BADGE_LABEL,
   type LiveClassDisplayState,
 } from '../../features/liveClasses/status';
-import { formatCountdown, formatStartTime } from '../../features/liveClasses/timing';
+import { formatStartTime } from '../../features/liveClasses/timing';
 import { useOptionalTheme } from '../../theme/ThemeProvider';
 import { Badge, Banner, Button, Card, Text } from '../ui';
 
@@ -64,7 +65,9 @@ export function LiveClassCard({ liveClass, state, now, canOpen, coachLabel, onOp
       <Text role="bodySm" tone="muted">
         {formatStartTime(liveClass.starts_at)}
       </Text>
-      <Text role="labelSm">{formatCountdown(liveClass.starts_at, now)}</Text>
+      <Text role="labelSm" testID={`live-class-timing-${liveClass.id}`}>
+        {formatClassTiming(liveClass.status, liveClass.starts_at, now)}
+      </Text>
 
       {state === 'starting-soon' ? (
         // The badge says it once; this repeats it where the eye lands, with the clock time,

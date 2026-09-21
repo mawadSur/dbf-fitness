@@ -7,6 +7,7 @@ import { CONTENT_MAX_WIDTH, hitSlopFor, minTouchTarget, screenGutter } from '../
 import { PressableBase } from '../ui/PressableBase';
 import { Text } from '../ui/Typography';
 import { DayCellButton } from './DayCellButton';
+import { LevelledHeading } from './LevelledHeading';
 import { dayNumberMaxFontScale } from './fontScale';
 import {
   WEEKDAY_INITIALS,
@@ -123,9 +124,16 @@ export function MonthGrid({
           disabled={!canGoPrev}
           onPress={onPrev}
         />
-        <Text role="h3" align="center" style={{ flex: 1 }} accessibilityRole="header">
+        {/* The month is the screen's ONE section title: level 2 under the "Calendar" h1. */}
+        <LevelledHeading
+          level={2}
+          role="h3"
+          align="center"
+          style={{ flex: 1 }}
+          testID="month-grid-title"
+        >
           {monthTitle(month)}
-        </Text>
+        </LevelledHeading>
         <MonthStepper direction="next" label="Next month" disabled={!canGoNext} onPress={onNext} />
       </View>
 

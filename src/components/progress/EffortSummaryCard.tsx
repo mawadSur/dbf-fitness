@@ -19,8 +19,11 @@ export const EFFORT_MAX = 10;
  * accessible name, so nothing depends on seeing the arc; it is deliberately NOT
  * repeated a third time in a tile.
  *
- * Until a coach has scored anything the arc sits at zero, which on its own would
- * read as "you scored nothing". The line underneath says what it actually means.
+ * Until a coach has scored anything there is NO ring. A ring drawn at zero is
+ * a measurement — "0 of 10" beside the words "No effort score yet" claimed the
+ * member had been scored and had scored nothing, which is the opposite of the
+ * truth. Absence of data gets the shape of absence: a dash where the number
+ * goes, no arc, no denominator.
  */
 export function EffortSummaryCard({ row }: { row: EffortRow }) {
   const { tokens } = useOptionalTheme();
@@ -29,18 +32,32 @@ export function EffortSummaryCard({ row }: { row: EffortRow }) {
   return (
     <Card testID="effort-summary" tone="soft" padding={24} style={{ gap: tokens.space.lg }}>
       <View style={{ alignItems: 'center', gap: tokens.space.sm }}>
-        <ProgressRing
-          testID="effort-ring"
-          value={avgEffortValue(row.avg_effort_score)}
-          max={EFFORT_MAX}
-          label="Average effort"
-          valueCaption={`of ${EFFORT_MAX}`}
-          size={132}
-        />
-        {scored ? null : (
-          <Text role="bodySmMedium" tone="secondary" align="center">
-            No effort score yet
-          </Text>
+        {scored ? (
+          <ProgressRing
+            testID="effort-ring"
+            value={avgEffortValue(row.avg_effort_score)}
+            max={EFFORT_MAX}
+            label="Average effort"
+            valueCaption={`of ${EFFORT_MAX}`}
+            size={132}
+          />
+        ) : (
+          <View
+            testID="effort-unscored"
+            accessible
+            accessibilityRole="text"
+            accessibilityLabel="Average effort: not scored yet"
+            style={{ alignItems: 'center', gap: tokens.space.xs, paddingVertical: tokens.space.md }}
+          >
+            {/* The dash is the value, so it is sized like one; the word beside
+                it carries the meaning, because a dash alone is not a status. */}
+            <Text role="display" tone="muted" align="center" accessibilityRole="none">
+              —
+            </Text>
+            <Text role="bodySmMedium" tone="secondary" align="center">
+              No effort score yet
+            </Text>
+          </View>
         )}
         <Text role="caption" tone="muted" align="center">
           {scored
