@@ -1,10 +1,10 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { RETRY_COPY, retryReason } from '../../features/notes/status';
 import type { RecordingSummary } from '../../features/notes/types';
-import { NotesButton } from './NotesButton';
+import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { Button, Card, Icon, PressableBase, Text } from '../ui';
 import { StatusChip } from './StatusChip';
-import { PressableBase } from '../ui/PressableBase';
 
 export function formatRecordingDate(iso: string | null): string {
   if (!iso) return '';
@@ -22,6 +22,7 @@ type Props = {
 };
 
 export function RecordingListItem({ recording, showStatus, onPress, onRetry, retrying = false }: Props) {
+  const { colors } = useOptionalTheme();
   const title = recording.classTitle ?? 'Class recording';
   const date = formatRecordingDate(recording.classStartsAt ?? recording.createdAt);
   // Not just 'failed': a recording whose pipeline hand-off was lost, or whose run was killed
@@ -29,52 +30,49 @@ export function RecordingListItem({ recording, showStatus, onPress, onRetry, ret
   const reason = retryReason(recording);
 
   return (
-    <View
-      style={{
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        backgroundColor: '#F8FAFC',
-        borderRadius: 12,
-        overflow: 'hidden',
-      }}
-    >
-      <PressableBase
-        onPress={onPress}
-        accessibilityRole="button"
-        accessibilityLabel={`Open ${title}`}
-        android_ripple={{ color: '#E2E8F0' }}
-        pressFeedback={0.75}
-        // Layout NEVER goes in a style callback — see `PressableBase`.
-        style={{
-          minHeight: 64,
-          padding: 16,
-          gap: 6,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Text numberOfLines={1} style={{ flex: 1, fontSize: 16, fontWeight: '600', color: '#0F172A' }}>
-            {title}
-          </Text>
+    <Card padding={16}>
+      <View style={{ gap: 12 }}>
+        <PressableBase
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${title}`}
+          android_ripple={{ color: colors.bgSoft }}
+          pressFeedback={0.75}
+          // Layout NEVER goes in a style callback — see `PressableBase`.
+          style={{ minHeight: 44, gap: 6, justifyContent: 'center' }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Text role="label" numberOfLines={2} style={{ flex: 1 }}>
+              {title}
+            </Text>
+            <Icon name="chevron-right" size={20} color={colors.textMuted} />
+          </View>
+          {date ? (
+            <Text role="bodySm" tone="muted">
+              {date}
+            </Text>
+          ) : null}
           {showStatus ? <StatusChip status={recording.status} /> : null}
-        </View>
-        {date ? <Text style={{ fontSize: 13, color: '#475569' }}>{date}</Text> : null}
-        {showStatus && reason ? (
-          <Text numberOfLines={2} style={{ fontSize: 13, color: '#B91C1C' }}>
-            {(reason === 'failed' ? recording.errorMessage : null) ?? RETRY_COPY[reason].explanation}
-          </Text>
-        ) : null}
-      </PressableBase>
-      {onRetry && reason ? (
-        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-          <NotesButton
+          {showStatus && reason ? (
+            <View style={{ flexDirection: 'row', gap: 6, alignItems: 'flex-start' }}>
+              <Icon name="alert-triangle" size={16} color={colors.danger} />
+              <Text role="bodySm" tone="danger" numberOfLines={3} style={{ flex: 1 }}>
+                {(reason === 'failed' ? recording.errorMessage : null) ?? RETRY_COPY[reason].explanation}
+              </Text>
+            </View>
+          ) : null}
+        </PressableBase>
+        {onRetry && reason ? (
+          <Button
             label={RETRY_COPY[reason].label}
             variant="secondary"
-            busy={retrying}
+            loading={retrying}
             onPress={onRetry}
             accessibilityLabel={`Retry ${title}`}
+            fullWidth
           />
-        </View>
-      ) : null}
-    </View>
+        ) : null}
+      </View>
+    </Card>
   );
 }

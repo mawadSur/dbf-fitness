@@ -61,7 +61,14 @@ describe('SignInScreen', () => {
     expect(password.props.textContentType).toBe('password');
     expect(password.props.autoComplete).toBe('current-password');
     expect(password.props.returnKeyType).toBe('done');
-    expect(email.props.placeholderTextColor).toBe('#64748B');
+    // Redesign: labels are visible above the field instead of placeholder-only,
+    // so there is no low-contrast placeholder left to check.
+    expect(email.props.placeholder).toBeUndefined();
+    expect(screen.getByText('Email')).toBeTruthy();
+    expect(screen.getByText('Password')).toBeTruthy();
+    expect(screen.getByTestId('sign-in-screen-scroll').props.keyboardShouldPersistTaps).toBe(
+      'handled'
+    );
   });
 
   it('disables submit until both fields are filled and exposes that state', async () => {
@@ -108,9 +115,16 @@ describe('SignInScreen', () => {
     await fireEvent.changeText(screen.getByLabelText('Password'), 'bad');
     await fireEvent.press(screen.getByRole('button', { name: 'Sign in' }));
 
+    // Redesign: the raw GoTrue string never reaches the member; the Banner says what
+    // to do instead, inside a polite live region so it is announced on appearance.
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Invalid login credentials');
-    expect(alert.props.accessibilityLiveRegion).toBe('polite');
+    expect(alert).toBeTruthy();
+    expect(screen.queryByText('Invalid login credentials')).toBeNull();
+    expect(
+      screen.getByText('That email and password do not match. Check them and try again.')
+    ).toBeTruthy();
+    expect(screen.getByText('That did not work')).toBeTruthy();
+    expect(screen.getByTestId('sign-in-error-live').props.accessibilityLiveRegion).toBe('polite');
     expect(mockReplace).not.toHaveBeenCalled();
   });
 });
@@ -125,9 +139,9 @@ describe('SignInScreen deleted-account notice', () => {
   it('shows a dismissible live-region alert for ?deleted=1 and clears the param', async () => {
     mockParams = { deleted: '1' };
     await renderScreen(<SignInScreen />);
-    const alert = screen.getByText('Your account was deleted.').parent!;
-    expect(alert.props.accessibilityRole).toBe('alert');
-    expect(alert.props.accessibilityLiveRegion).toBe('polite');
+    expect(screen.getByText('Your account was deleted.')).toBeTruthy();
+    expect(screen.getByTestId('deleted-notice').props.accessibilityRole).toBe('alert');
+    expect(screen.getByTestId('deleted-notice-live').props.accessibilityLiveRegion).toBe('polite');
     await waitFor(() => expect(mockSetParams).toHaveBeenCalledWith({ deleted: undefined }));
 
     await fireEvent.press(screen.getByRole('button', { name: 'Dismiss notice' }));
@@ -191,7 +205,9 @@ describe('SignUpScreen', () => {
     await fireEvent.changeText(screen.getByLabelText('Password'), 'secret12');
     await fireEvent.press(screen.getByRole('button', { name: 'Create account' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('User already registered');
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    // GoTrue's own copy is already member-facing, so it passes through as the detail.
+    expect(screen.getByText('User already registered')).toBeTruthy();
     expect(
       screen.getByRole('button', { name: 'Create account' }).props.accessibilityState.busy
     ).toBe(false);
@@ -236,8 +252,9 @@ describe('SignUpScreen', () => {
     await fireEvent.changeText(screen.getByLabelText('Password'), 'secret12');
     await fireEvent.press(screen.getByRole('button', { name: 'Create account' }));
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Could not create your account. Please try again.');
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(screen.getByText('Could not create your account. Please try again.')).toBeTruthy();
+    expect(screen.queryByText(/violates|duplicate key/i)).toBeNull();
     expect(mockReplace).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import type { Coach } from '../../features/coaching/types';
-import { coachCardState, initialOf, memberCountLabel, subscriptionChip } from './coachCardState';
+import { coachCardState, memberCountLabel, subscriptionChip } from './coachCardState';
 
 const coach = (over: Partial<Coach> = {}): Coach => ({
   coachId: 'c1',
@@ -28,15 +28,23 @@ describe('coachCardState', () => {
     expect(memberCountLabel(1)).toBe('1 member');
     expect(memberCountLabel(0)).toBe('0 members');
   });
-  it('initialOf handles empty and unicode names', () => {
-    expect(initialOf('  dana')).toBe('D');
-    expect(initialOf('')).toBe('?');
+  it('maps every subscription state to a design-system badge tone', () => {
+    expect(subscriptionChip('active')).toMatchObject({ label: 'Active', tone: 'success' });
+    expect(subscriptionChip('grace').tone).toBe('warning');
+    expect(subscriptionChip('expired')).toMatchObject({ label: 'Expired', tone: 'danger' });
+    expect(subscriptionChip('staff')).toMatchObject({ label: 'Coach access', tone: 'info' });
+    expect(subscriptionChip('none')).toMatchObject({ label: 'Not subscribed', tone: 'danger' });
   });
-  it('maps every subscription state to a chip', () => {
-    expect(subscriptionChip('active').tone).toBe('good');
-    expect(subscriptionChip('grace').tone).toBe('warn');
-    expect(subscriptionChip('expired').tone).toBe('bad');
-    expect(subscriptionChip('staff').tone).toBe('neutral');
-    expect(subscriptionChip('none').label).toBe('Not subscribed');
+  it('carries an icon as well as a word, so status is never colour alone', () => {
+    for (const state of ['active', 'grace', 'expired', 'staff', 'none']) {
+      const chip = subscriptionChip(state);
+      expect(chip.icon).toBeTruthy();
+      expect(chip.label.length).toBeGreaterThan(0);
+    }
+  });
+  it('tells a member in the grace window how long is left', () => {
+    expect(subscriptionChip('grace', 7).label).toBe('Payment overdue — 7 days left');
+    expect(subscriptionChip('grace', 1).label).toBe('Payment overdue — 1 day left');
+    expect(subscriptionChip('grace', 0).label).toBe('Payment overdue');
   });
 });

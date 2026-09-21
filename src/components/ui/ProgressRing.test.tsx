@@ -228,4 +228,31 @@ describe('ProgressRing', () => {
       await waitFor(() => expect(arcOffset()).toBeCloseTo(circumference() / 2, 1));
     });
   });
+
+  /*
+   * Regression: `Animated.createAnimatedComponent` FORCES `collapsable: false`
+   * onto whatever it wraps, so the native view is never flattened. An SVG
+   * `Circle` is not a native view, and react-native-svg spreads what it does
+   * not recognise straight onto the node — so every mounted ring logged
+   *
+   *   Received `false` for a non-boolean attribute `collapsable`.
+   *
+   * on web, and the same complaint as a red LogBox toast on Android. The dev
+   * gallery mounts three rings, so it popped a toast the moment it opened.
+   * `ProgressRing` now wraps `Circle` to swallow the prop.
+   */
+  describe('the animated arc', () => {
+    it('never passes `collapsable` down to the SVG circle', async () => {
+      await renderInTheme(<ProgressRing value={15} max={30} label="Half" testID="ring" />);
+      for (const circle of circles()) {
+        expect(circle.props).not.toHaveProperty('collapsable');
+      }
+    });
+
+    it('still animates, so the wrapper did not break the ref Animated drives', async () => {
+      await renderInTheme(<ProgressRing value={15} max={30} label="Half" testID="ring" />);
+      expect(circles()).toHaveLength(2);
+      await waitFor(() => expect(arcOffset()).toBeCloseTo(circumference() / 2, 1));
+    });
+  });
 });

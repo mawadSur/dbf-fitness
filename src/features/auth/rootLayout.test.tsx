@@ -15,6 +15,7 @@ import { useFonts } from 'expo-font';
 // (the bug that logged "Can't perform a React state update on a component that hasn't mounted yet")
 // ever comes back, the layout throws on the missing export and these tests go red.
 const mockGuards: boolean[] = [];
+const mockScreenOptions: Record<string, Record<string, unknown> | undefined> = {};
 
 jest.mock('../../../global.css', () => ({}));
 jest.mock('expo-router', () => {
@@ -23,7 +24,14 @@ jest.mock('expo-router', () => {
   function Stack({ children }: { children?: unknown }) {
     return <View testID="stack">{children as never}</View>;
   }
-  Stack.Screen = function Screen({ name }: { name: string }) {
+  Stack.Screen = function Screen({
+    name,
+    options,
+  }: {
+    name: string;
+    options?: Record<string, unknown>;
+  }) {
+    mockScreenOptions[name] = options;
     return <View testID={`screen-${name}`} />;
   };
   // Mirrors expo-router: children of a guarded-out <Stack.Protected> are not registered.
@@ -251,18 +259,43 @@ describe('RootLayout status bar', () => {
   });
 
   /*
-   * Regression: the style followed the RESOLVED THEME, so with the OS in night
-   * mode it switched to white glyphs — over screens that still paint the
-   * hard-coded white legacy page. The measured top band of the Android home
-   * screen was 100% (255,255,255): the clock, wifi and battery disappeared.
-   * The style follows what the SCREEN paints (src/theme/chrome.ts) instead.
+   * The style follows what the SCREEN paints. That used to mean pinning it to
+   * dark glyphs even in night mode, because every screen still painted the
+   * hard-coded white legacy page and white-on-white made the clock, wifi and
+   * battery disappear (the measured top band of the Android home screen was
+   * 100% (255,255,255)). Stage 2 migrated the screens, so the page really is
+   * dark in night mode now and the glyphs must be LIGHT to stay legible —
+   * pinning them dark would recreate the same bug with the colours swapped.
    */
-  it('keeps dark status bar content when the OS is in dark mode', async () => {
+  it('uses light status bar content when the OS is in dark mode', async () => {
     jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('dark');
     getSession.mockResolvedValue({ data: { session: null } });
     await render(<RootLayout />);
-    expect(screen.getByTestId('status-bar-dark')).toBeTruthy();
-    expect(screen.queryByTestId('status-bar-light')).toBeNull();
+    expect(screen.getByTestId('status-bar-light')).toBeTruthy();
+    expect(screen.queryByTestId('status-bar-dark')).toBeNull();
+  });
+
+  /**
+   * The native stack header is the ONE piece of chrome that cannot read
+   * `useTheme()`, so a route that turns it on gets a hard-white bar in dark
+   * mode whatever the page behind it paints. Calendar was the last such route:
+   * its band measured rgb(255,255,255) over the dark-emerald page, and the
+   * light status-bar glyphs this layout asks for vanished into it (a 100%
+   * white 90px band with no clock, wifi or battery). Every route now draws its
+   * own themed `ScreenHeader` inside a `ScreenShell`.
+   */
+  it('turns the native stack header OFF on every route', async () => {
+    getSession.mockResolvedValue({ data: { session: SESSION } });
+    await render(<RootLayout />);
+    await screen.findByTestId('stack');
+    for (const [name, options] of Object.entries(mockScreenOptions)) {
+      expect({ name, headerShown: options?.headerShown }).toEqual({
+        name,
+        headerShown: undefined,
+      });
+    }
+    // The calendar is still a modal — only its header is gone.
+    expect(mockScreenOptions.calendar).toEqual({ presentation: 'modal' });
   });
 });
 

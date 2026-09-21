@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react-native';
 import { Appearance } from 'react-native';
 
 import { ThemeProvider } from '../theme/ThemeProvider';
-import { colors, lightTheme } from '../theme/tokens';
+import { colors, darkTheme, lightTheme } from '../theme/tokens';
 import { ScoreRing } from './ScoreRing';
 
 describe('theme tokens', () => {
@@ -29,14 +29,29 @@ describe('ScoreRing', () => {
   });
 });
 
-describe('ScoreRing palette pin', () => {
+describe('ScoreRing theme', () => {
   /*
-   * The home screen still paints the hard-coded white legacy page, so the ring
-   * must keep the light palette even when the member's theme resolves to dark
-   * — the same reason the status bar and the tab bar are pinned.
+   * The pin is gone with redesign stage 2: Home is themed, so a light-pinned
+   * ring would be the mismatch. The ring must now follow the resolved theme.
    */
-  it('keeps the light palette under the dark theme', async () => {
+  it('follows the dark theme instead of pinning the light palette', async () => {
     jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('dark');
+    await render(
+      <ThemeProvider>
+        <ScoreRing value={5} max={30} label="Day streak" />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText('5').props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ color: darkTheme.text })]),
+    );
+    expect(screen.getByText('5').props.style).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ color: lightTheme.text })]),
+    );
+    jest.restoreAllMocks();
+  });
+
+  it('uses the light palette under the light theme', async () => {
+    jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('light');
     await render(
       <ThemeProvider>
         <ScoreRing value={5} max={30} label="Day streak" />

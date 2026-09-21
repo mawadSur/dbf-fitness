@@ -2,7 +2,6 @@ import { fireEvent, screen } from '@testing-library/react-native';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { StyleSheet, View } from 'react-native';
 
-import { chromeScheme } from '../../theme/chrome';
 import { fontFamily, tabBarBackground, type ThemeName } from '../../theme/tokens';
 import {
   MAX_FONT_SCALE,
@@ -18,6 +17,7 @@ import {
   tabBarContentHeight,
   tabBarItemWidth,
   tabBarLabelFits,
+  tabBarLabelFitScale,
   tabBarLabelLineHeight,
   tabBarLabelLines,
 } from '../ui/layout';
@@ -241,13 +241,19 @@ describe('DbfTabBar', () => {
       expect(flattenStyle(screen.getByText('Home').props.style).color).toBe(colorsFor('light').text);
     });
 
-    it('mounts the app bar on the light chrome even under the dark theme', async () => {
+    /*
+     * The bar used to be pinned to the light palette because the tab screens
+     * painted a hard-coded white page. Stage 2 migrated them, so the shipped bar
+     * follows the theme: under the dark theme it must be the DARK bar, and it
+     * must no longer come back light.
+     */
+    it('mounts the app bar on the dark chrome under the dark theme', async () => {
       await renderWithInsets(<AppTabBar {...tabBarProps(0)} />, {
         scheme: 'dark',
         metrics: metricsWith({ bottom: 0 }),
       });
-      expect(barStyle().backgroundColor).toBe(tabBarBackground[chromeScheme('dark')]);
-      expect(barStyle().backgroundColor).toBe(tabBarBackground.light);
+      expect(barStyle().backgroundColor).toBe(tabBarBackground.dark);
+      expect(barStyle().backgroundColor).not.toBe(tabBarBackground.light);
     });
   });
 
@@ -332,13 +338,21 @@ describe('DbfTabBar', () => {
       expect(screen.getByText('Community').props.numberOfLines).toBe(1);
     });
 
-    it('grows the bar and wraps labels to two lines at a 200% font scale', async () => {
+    it('grows the bar but keeps every label on ONE line at a 200% font scale', async () => {
       mockWindowDimensions({ fontScale: 2 });
       await renderBar(0, { bottom: 0 });
 
-      const expectedLineHeight = tabBarLabelLineHeight(2);
-      const expectedHeight = tabBarContentHeight(2, 2);
-      expect(tabBarLabelLines(2, 390, TABS.length, 'Community')).toBe(2);
+      // The OS asks for 200%; the label takes the largest scale its own tab
+      // can hold on one line (a tab label is one word, so the only break the
+      // platform can make is BETWEEN LETTERS — at 200% the emulator drew
+      // "Commu" over "nity" while the other four tabs stayed single-line).
+      const labelScale = tabBarLabelFitScale(390, TABS.length, 'Community');
+      expect(labelScale).toBeGreaterThan(1);
+      expect(labelScale).toBeLessThan(TAB_BAR_LABEL_MAX_FONT_SCALE);
+      expect(tabBarLabelLines(labelScale, 390, TABS.length, 'Community')).toBe(1);
+
+      const expectedLineHeight = tabBarLabelLineHeight(labelScale);
+      const expectedHeight = tabBarContentHeight(labelScale, 1);
 
       // The bar is taller than the default so the bigger text has somewhere to go.
       expect(expectedHeight).toBeGreaterThan(tabBarContentHeight(1, 1));
@@ -355,12 +369,13 @@ describe('DbfTabBar', () => {
       expect(label.lineHeight).toBe(TAB_BAR_LABEL_LINE_HEIGHT);
       expect(label.lineHeight).toBeLessThan(expectedLineHeight);
       // What the OS will actually draw is what the bar reserved.
-      expect(Math.ceil(Number(label.lineHeight) * TAB_BAR_LABEL_MAX_FONT_SCALE)).toBe(expectedLineHeight);
-      expect(screen.getByText('Community').props.numberOfLines).toBe(2);
+      expect(Math.ceil(Number(label.lineHeight) * labelScale)).toBe(expectedLineHeight);
+      expect(screen.getByText('Community').props.numberOfLines).toBe(1);
+      expect(screen.getByText('Community').props.maxFontSizeMultiplier).toBe(labelScale);
 
-      // Nothing is clipped VERTICALLY: the reserved height covers two scaled
-      // lines plus the pill, the icon and the gaps around them.
-      expect(expectedHeight).toBeGreaterThanOrEqual(expectedLineHeight * 2 + TAB_BAR_ICON_SIZE);
+      // Nothing is clipped VERTICALLY: the reserved height covers the scaled
+      // line plus the pill, the icon and the gaps around them.
+      expect(expectedHeight).toBeGreaterThanOrEqual(expectedLineHeight + TAB_BAR_ICON_SIZE);
 
       // ...and nothing is clipped HORIZONTALLY either. The label is a
       // tail-truncating box (`ellipsizeMode="tail"`), so the height assertions
@@ -382,16 +397,35 @@ describe('DbfTabBar', () => {
       // which cost 19pt of screen on a phone where the label still fits one.
       mockWindowDimensions({ width: 412, fontScale: 1.05 });
       await renderBar(0, { bottom: 0 });
+      // 1.05 is under the 412pt one-line fit (~1.16), so nothing is capped here.
+      expect(tabBarLabelFitScale(412, TABS.length, 'Community')).toBeGreaterThan(1.05);
       expect(screen.getByText('Community').props.numberOfLines).toBe(1);
       expect(barStyle().height).toBe(tabBarContentHeight(1.05, 1));
       expect(barStyle().height).toBeLessThan(tabBarContentHeight(1.05, 2));
     });
 
-    it('still takes the second line at 105% on a 360pt phone, where it is needed', async () => {
+    it('holds one line on a 360pt phone by capping the label, not by wrapping it', async () => {
+      // 360pt is the narrowest viewport we support: five tabs leave the label
+      // 67.5pt, and "Community" needs 66.9pt at its BASE size. So the label
+      // cannot grow here at all — but it still fits, and one whole word beats
+      // "Commu" / "nity".
       mockWindowDimensions({ width: 360, fontScale: 1.05 });
       await renderBar(0, { bottom: 0 });
+      const labelScale = tabBarLabelFitScale(360, TABS.length, 'Community');
+      expect(labelScale).toBeCloseTo(1, 1);
+      expect(labelScale).toBeLessThan(1.05);
+      expect(screen.getByText('Community').props.numberOfLines).toBe(1);
+      expect(barStyle().height).toBe(tabBarContentHeight(labelScale, 1));
+    });
+
+    it('never shrinks a tab label below its base 12pt', async () => {
+      // A bar too narrow to hold the label at 100% takes the two-line box
+      // rather than sub-12pt glyphs.
+      mockWindowDimensions({ width: 240, fontScale: 2 });
+      await renderBar(0, { bottom: 0 });
+      expect(tabBarLabelFitScale(240, TABS.length, 'Community')).toBe(1);
+      expect(screen.getByText('Community').props.maxFontSizeMultiplier).toBe(1);
       expect(screen.getByText('Community').props.numberOfLines).toBe(2);
-      expect(barStyle().height).toBe(tabBarContentHeight(1.05, 2));
     });
 
     it('would fail if a tab were wider than its share — the fit helper is not vacuous', () => {
@@ -401,21 +435,23 @@ describe('DbfTabBar', () => {
       expect(tabBarLabelFits(390, TABS.length, 2, 'Accountability Partners')).toBe(false);
     });
 
-    it('stops reserving height past 200%, so a 400% scale does not eat the screen', async () => {
+    it('stops reserving height past the label cap, so a 400% scale does not eat the screen', async () => {
       mockWindowDimensions({ fontScale: 4 });
       await renderBar(0, { bottom: 0 });
-      expect(barStyle().height).toBe(tabBarContentHeight(2, 2));
+      const labelScale = tabBarLabelFitScale(390, TABS.length, 'Community');
+      expect(barStyle().height).toBe(tabBarContentHeight(labelScale, 1));
+      expect(barStyle().height).toBeLessThan(tabBarContentHeight(MAX_FONT_SCALE, 2));
     });
 
-    it('caps the glyphs at 150%, so two lines can really hold the longest label', async () => {
+    it('caps the glyphs at the one-line fit, and never past 150%', async () => {
       mockWindowDimensions({ fontScale: 4 });
       await renderBar(0, { bottom: 0 });
-      // At 200% "Community" is 134pt of glyphs and greedy-breaks as
-      // "Com"/"muni…" in two 74pt lines — the label, not just the box, has to
-      // stop scaling. The full name stays in the tab's accessibilityLabel.
-      expect(screen.getByText('Community').props.maxFontSizeMultiplier).toBe(
-        TAB_BAR_LABEL_MAX_FONT_SCALE,
-      );
+      // At 200% "Community" is 134pt of glyphs in a 74pt tab: the label, not
+      // just the box, has to stop scaling. The full name stays in the tab's
+      // accessibilityLabel at any OS text size.
+      const labelScale = screen.getByText('Community').props.maxFontSizeMultiplier;
+      expect(labelScale).toBe(tabBarLabelFitScale(390, TABS.length, 'Community'));
+      expect(labelScale).toBeLessThanOrEqual(TAB_BAR_LABEL_MAX_FONT_SCALE);
       expect(TAB_BAR_LABEL_MAX_FONT_SCALE).toBeLessThan(MAX_FONT_SCALE);
       expect(tab('community').props.accessibilityLabel).toBe('Community');
       expect(tabBarLabelFits(360, TABS.length, MAX_FONT_SCALE, 'Community')).toBe(true);

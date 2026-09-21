@@ -1,10 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, ScrollView, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState } from 'react';
+import { Keyboard, View } from 'react-native';
 
-import { friendlyErrorMessage } from '../friendlyError';
-import { KEYBOARD_AVOIDING_BEHAVIOR } from '../keyboard';
 import { createLiveClass, type LiveClass } from '../../features/liveClasses/api';
 import {
   quickPicks,
@@ -12,11 +9,21 @@ import {
   validateScheduleForm,
   type ScheduleFormErrors,
 } from '../../features/liveClasses/scheduleForm';
-import { LiveButton } from './LiveButton';
+import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { friendlyErrorMessage } from '../friendlyError';
+import {
+  Banner,
+  Button,
+  Chip,
+  Input,
+  ScreenHeader,
+  ScreenShell,
+  SectionHeader,
+  Text,
+} from '../ui';
 
+/** Kept for the safe-area test: the shell's scroll padding inside the tab shell. */
 export const FORM_BOTTOM_PADDING = 24;
-const INPUT =
-  'min-h-[44px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900';
 
 /** Coach-only "Schedule class" form. Times are read as the user's LOCAL time. */
 export function ScheduleClassForm({
@@ -28,13 +35,12 @@ export function ScheduleClassForm({
   onBack: () => void;
   onCreated: (created: LiveClass) => void;
 }) {
-  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const dateRef = useRef<TextInput>(null);
-  const timeRef = useRef<TextInput>(null);
+  const { tokens } = useOptionalTheme();
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [picked, setPicked] = useState<string | null>(null);
   const [errors, setErrors] = useState<ScheduleFormErrors>({});
 
   const create = useMutation({
@@ -59,117 +65,108 @@ export function ScheduleClassForm({
   const picks = quickPicks();
 
   return (
-    // 'padding' on BOTH platforms: with Android edge-to-edge the window no longer resizes for the
-    // keyboard, so an undefined behavior leaves the focused field and submit button covered.
-    <KeyboardAvoidingView className="flex-1 bg-white" behavior={KEYBOARD_AVOIDING_BEHAVIOR}>
-      <ScrollView
-        testID="schedule-form-scroll"
-        className="flex-1 px-4"
-        contentContainerClassName="gap-4"
-        // The tab bar under this screen already clears the home indicator: no insets.bottom here.
-        contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: FORM_BOTTOM_PADDING }}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-      >
-        <View className="w-full max-w-[560px] gap-4 self-center">
-          <LiveButton label="‹ Back" variant="ghost" onPress={onBack} className="self-start" accessibilityLabel="Back to live classes" />
-          <Text className="text-2xl font-bold text-slate-900" accessibilityRole="header">
-            Schedule class
-          </Text>
+    <ScreenShell
+      testID="schedule-form"
+      insideTabs
+      keyboardAvoiding
+      contentStyle={{ gap: tokens.space.lg }}
+      header={
+        <ScreenHeader
+          title="Schedule class"
+          eyebrow="Coach"
+          onBack={onBack}
+          backAccessibilityLabel="Back to live classes"
+        />
+      }
+    >
+      <Input
+        testID="class-title"
+        label="Class title"
+        value={title}
+        onChangeText={setTitle}
+        placeholder="Saturday Conditioning"
+        helperText={`Up to ${TITLE_MAX_LENGTH} characters.`}
+        error={errors.title}
+        autoCapitalize="sentences"
+        autoComplete="off"
+        returnKeyType="next"
+        required
+      />
 
-          <View className="gap-1">
-            <Text className="text-sm font-semibold text-slate-900">Title</Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Saturday Conditioning"
-              placeholderTextColor="#64748B"
-              maxLength={TITLE_MAX_LENGTH + 20}
-              autoCapitalize="sentences"
-              autoComplete="off"
-              returnKeyType="next"
-              onSubmitEditing={() => dateRef.current?.focus()}
-              blurOnSubmit={false}
-              accessibilityLabel="Class title"
-              className={INPUT}
+      <View style={{ gap: tokens.space.sm }}>
+        <SectionHeader title="Quick pick" style={{ marginBottom: 0 }} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space.sm }}>
+          {picks.map((pick) => (
+            <Chip
+              key={pick.label}
+              testID={`quick-pick-${pick.label}`}
+              label={pick.label}
+              icon="clock"
+              selected={picked === pick.label}
+              onPress={() => {
+                setDate(pick.date);
+                setTime(pick.time);
+                setPicked(pick.label);
+                setErrors((previous) => ({ ...previous, date: undefined, time: undefined, when: undefined }));
+              }}
             />
-            {errors.title ? <Text className="text-sm text-red-700">{errors.title}</Text> : null}
-          </View>
-
-          <View className="gap-2">
-            <Text className="text-sm font-semibold text-slate-900">Quick pick</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {picks.map((pick) => (
-                <LiveButton
-                  key={pick.label}
-                  label={pick.label}
-                  variant="secondary"
-                  onPress={() => {
-                    setDate(pick.date);
-                    setTime(pick.time);
-                    setErrors((prev) => ({ ...prev, date: undefined, time: undefined, when: undefined }));
-                  }}
-                />
-              ))}
-            </View>
-          </View>
-
-          <View className="flex-row gap-3">
-            <View className="flex-1 gap-1">
-              <Text className="text-sm font-semibold text-slate-900">Date</Text>
-              <TextInput
-                ref={dateRef}
-                value={date}
-                onChangeText={setDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#64748B"
-                keyboardType="numbers-and-punctuation"
-                autoComplete="off"
-                autoCorrect={false}
-                returnKeyType="next"
-                onSubmitEditing={() => timeRef.current?.focus()}
-                blurOnSubmit={false}
-                accessibilityLabel="Class date, year-month-day"
-                className={INPUT}
-              />
-              {errors.date ? <Text className="text-sm text-red-700">{errors.date}</Text> : null}
-            </View>
-            <View className="flex-1 gap-1">
-              <Text className="text-sm font-semibold text-slate-900">Time</Text>
-              <TextInput
-                ref={timeRef}
-                value={time}
-                onChangeText={setTime}
-                placeholder="18:00"
-                placeholderTextColor="#64748B"
-                keyboardType="numbers-and-punctuation"
-                autoComplete="off"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={submit}
-                accessibilityLabel="Class start time"
-                className={INPUT}
-              />
-              {errors.time ? <Text className="text-sm text-red-700">{errors.time}</Text> : null}
-            </View>
-          </View>
-          <Text className="text-xs text-slate-600">Times use your local time zone.</Text>
-          {errors.when ? <Text className="text-sm text-red-700">{errors.when}</Text> : null}
-
-          {create.isError ? (
-            <Text className="text-sm text-red-700">
-              {friendlyErrorMessage(create.error, 'Could not schedule the class.')}
-            </Text>
-          ) : null}
-
-          <LiveButton
-            label={create.isPending ? 'Scheduling…' : 'Schedule class'}
-            onPress={submit}
-            busy={create.isPending}
-            accessibilityLabel="Schedule class"
-          />
+          ))}
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space.md }}>
+        <Input
+          testID="class-date"
+          label="Date"
+          value={date}
+          onChangeText={setDate}
+          placeholder="2026-10-03"
+          helperText="Year-month-day, like 2026-10-03."
+          error={errors.date}
+          keyboardType="numbers-and-punctuation"
+          autoComplete="off"
+          returnKeyType="next"
+          required
+          style={{ flexGrow: 1, flexBasis: 150 }}
+        />
+        <Input
+          testID="class-time"
+          label="Start time"
+          value={time}
+          onChangeText={setTime}
+          placeholder="18:00"
+          helperText="24-hour clock, like 18:00."
+          error={errors.time}
+          keyboardType="numbers-and-punctuation"
+          autoComplete="off"
+          returnKeyType="done"
+          onSubmitEditing={submit}
+          required
+          style={{ flexGrow: 1, flexBasis: 150 }}
+        />
+      </View>
+
+      <Text role="caption" tone="muted">
+        Times use your local time zone.
+      </Text>
+
+      {errors.when ? <Banner tone="danger" title={errors.when} testID="schedule-when-error" /> : null}
+
+      {create.isError ? (
+        <Banner
+          tone="danger"
+          title={friendlyErrorMessage(create.error, 'Could not schedule the class.')}
+          testID="schedule-create-error"
+        />
+      ) : null}
+
+      <Button
+        label="Schedule class"
+        leadingIcon="calendar"
+        onPress={submit}
+        loading={create.isPending}
+        accessibilityLabel="Schedule class"
+      />
+    </ScreenShell>
   );
 }

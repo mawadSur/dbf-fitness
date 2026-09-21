@@ -1,8 +1,9 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { billingUrl, CONTACT_COACH_TO_RENEW, openBilling } from '../../features/liveClasses/billing';
 import type { BlockedReason } from '../../features/liveClasses/joinDecision';
-import { LiveButton } from './LiveButton';
+import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { Banner, Button, Text } from '../ui';
 
 type Props = {
   reason: BlockedReason;
@@ -24,29 +25,32 @@ export const BLOCKED_COPY: Record<BlockedReason, { title: string; body: string; 
   },
 };
 
-/** Shown instead of Join when the member has no live-class access. Never crashes without a billing URL. */
+/**
+ * Shown instead of Join when the member has no live-class access. The warning
+ * `Banner` carries the icon and the words; the actions sit under it so the
+ * message is never a dead end. Never crashes without a billing URL.
+ */
 export function SubscriptionBlockedPanel({ reason, onRecheck, checking = false }: Props) {
+  const { tokens } = useOptionalTheme();
   const copy = BLOCKED_COPY[reason];
   const hasBilling = billingUrl() !== null;
 
   return (
-    <View
-      accessibilityRole="alert"
-      className="gap-2 rounded-xl border border-amber-300 bg-amber-50 p-4"
-    >
-      <Text className="text-base font-bold text-amber-900">{copy.title}</Text>
-      <Text className="text-sm text-amber-900">{copy.body}</Text>
+    <View testID="subscription-blocked" style={{ gap: tokens.space.md }}>
+      <Banner tone="warning" icon="lock" title={copy.title} message={copy.body} />
       {hasBilling ? (
-        <LiveButton label={copy.cta} onPress={() => void openBilling()} />
+        <Button label={copy.cta} onPress={() => void openBilling()} trailingIcon="external-link" />
       ) : (
-        <Text className="text-sm font-medium text-amber-900">{CONTACT_COACH_TO_RENEW}</Text>
+        <Text role="bodySm" tone="warning">
+          {CONTACT_COACH_TO_RENEW}
+        </Text>
       )}
       {onRecheck ? (
-        <LiveButton
+        <Button
           label="I’ve renewed — check again"
           variant="secondary"
           onPress={onRecheck}
-          busy={checking}
+          loading={checking}
         />
       ) : null}
     </View>

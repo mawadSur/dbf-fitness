@@ -1,10 +1,11 @@
-import { FlatList, Text, View } from 'react-native';
+import { useCallback } from 'react';
+import { FlatList, View } from 'react-native';
 
 import { itemSublabel } from '../../features/notes/checklist';
 import { summarizeProgress } from '../../features/notes/progress';
-import type { NoteChecklist } from '../../services/transcription/types';
-import { colors } from '../../theme/tokens';
-import { PressableBase } from '../ui/PressableBase';
+import type { NoteChecklist, NoteChecklistItem } from '../../services/transcription/types';
+import { Banner, Card, ChecklistRow, Heading, Text } from '../ui';
+import { ChecklistProgress } from './ChecklistProgress';
 
 type Props = {
   checklist: NoteChecklist;
@@ -32,106 +33,66 @@ export function MemberChecklist({
 }: Props) {
   const progress = summarizeProgress(checklist.items, checkedKeys);
 
+  const keyExtractor = useCallback((item: NoteChecklistItem) => item.key, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: NoteChecklistItem }) => {
+      const checked = checkedKeys.has(item.key);
+      const sublabel = itemSublabel(item);
+      if (readOnly) {
+        // A coach previewing a published note reads it; nothing here is tickable, so the row is
+        // text rather than a checkbox that lies about being pressable.
+        return (
+          <Card padding={16}>
+            <View style={{ gap: 4 }}>
+              <Text role={item.kind === 'exercise' ? 'label' : 'body'}>{item.text}</Text>
+              {sublabel ? (
+                <Text role="bodySm" tone="muted">
+                  {sublabel}
+                </Text>
+              ) : null}
+            </View>
+          </Card>
+        );
+      }
+      return (
+        <ChecklistRow
+          label={item.text}
+          sublabel={sublabel ?? undefined}
+          checked={checked}
+          onToggle={() => onToggle(item.key, checked)}
+        />
+      );
+    },
+    [checkedKeys, onToggle, readOnly],
+  );
+
   return (
     <FlatList
       data={checklist.items}
-      keyExtractor={(item) => item.key}
+      keyExtractor={keyExtractor}
       contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 8 }}
       refreshing={refreshing}
       onRefresh={onRefresh}
+      progressViewOffset={0}
       ListHeaderComponent={
         <View style={{ gap: 8, marginBottom: 8 }}>
-          <Text style={{ fontSize: 22, fontWeight: '700', color: '#0F172A' }}>{checklist.title}</Text>
-          {subtitle ? <Text style={{ fontSize: 13, color: '#475569' }}>{subtitle}</Text> : null}
-          {readOnly ? null : (
-          <Text
-            accessibilityRole="progressbar"
-            accessibilityLabel={progress.label}
-            accessibilityValue={{ min: 0, max: progress.total, now: progress.done }}
-            style={{ fontSize: 15, fontWeight: '600', color: '#047857' }}
-          >
-            {progress.label}
-          </Text>
-          )}
-          {readOnly ? null : (
-            <View style={{ height: 8, borderRadius: 4, backgroundColor: colors.primaryMuted, overflow: 'hidden' }}>
-              <View
-                style={{
-                  height: 8,
-                  width: `${Math.round(progress.fraction * 100)}%`,
-                  backgroundColor: colors.primary,
-                }}
-              />
-            </View>
-          )}
-          {errorNotice ? (
-            <Text accessibilityRole="alert" style={{ fontSize: 13, color: '#B91C1C' }}>
-              {errorNotice}
+          <Heading level={2}>{checklist.title}</Heading>
+          {subtitle ? (
+            <Text role="bodySm" tone="muted">
+              {subtitle}
             </Text>
           ) : null}
+          {readOnly ? null : <ChecklistProgress done={progress.done} total={progress.total} label={progress.label} />}
+          {errorNotice ? <Banner tone="danger" title={errorNotice} /> : null}
         </View>
       }
       ListEmptyComponent={
-        <Text style={{ fontSize: 14, color: '#475569' }}>This checklist has no items.</Text>
+        <Text role="bodySm" tone="muted">
+          This checklist has no items.
+        </Text>
       }
-      renderItem={({ item }) => {
-        const checked = checkedKeys.has(item.key);
-        const sublabel = itemSublabel(item);
-        return (
-          <PressableBase
-            onPress={() => onToggle(item.key, checked)}
-            disabled={readOnly}
-            accessibilityRole={readOnly ? 'text' : 'checkbox'}
-            accessibilityLabel={item.text}
-            accessibilityState={{ checked }}
-            android_ripple={{ color: '#D1FAE5' }}
-            pressFeedback={0.75}
-            // Layout NEVER goes in a style callback — see `PressableBase`.
-            style={{
-              minHeight: 56,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 12,
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-              backgroundColor: checked ? '#F0FDF4' : '#F8FAFC',
-              borderRadius: 12,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
-            }}
-          >
-            {readOnly ? null : (
-            <View
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                borderWidth: 2,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderColor: checked ? '#047857' : '#94A3B8',
-                backgroundColor: checked ? '#047857' : '#FFFFFF',
-              }}
-            >
-              {checked ? <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>✓</Text> : null}
-            </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: item.kind === 'exercise' ? '600' : '400',
-                  color: checked ? '#475569' : '#0F172A',
-                  textDecorationLine: checked ? 'line-through' : 'none',
-                }}
-              >
-                {item.text}
-              </Text>
-              {sublabel ? <Text style={{ fontSize: 13, color: '#475569' }}>{sublabel}</Text> : null}
-            </View>
-          </PressableBase>
-        );
-      }}
+      renderItem={renderItem}
     />
   );
 }

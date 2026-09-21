@@ -1,4 +1,4 @@
-import { initialsOf, mergeRosterWithPresence, onlineIdsFromPresenceState } from './roster';
+import { mergeRosterWithPresence, onlineIdsFromPresenceState } from './roster';
 
 const jordan = { member_id: 'u-jordan', full_name: 'Jordan Lee' };
 const sam = { member_id: 'u-sam', full_name: 'Sam Rivera' };
@@ -78,22 +78,5 @@ describe('onlineIdsFromPresenceState', () => {
     });
 
     expect([...ids]).toEqual(['u-ok']);
-  });
-});
-
-describe('initialsOf', () => {
-  it('uses the first and last word', () => {
-    expect(initialsOf('Jordan Lee')).toBe('JL');
-    expect(initialsOf('Mary Jane Watson')).toBe('MW');
-  });
-
-  it('handles single names, lowercase and extra whitespace', () => {
-    expect(initialsOf('sam')).toBe('S');
-    expect(initialsOf('  alex   kim ')).toBe('AK');
-  });
-
-  it('falls back to a placeholder for an empty name', () => {
-    expect(initialsOf('')).toBe('?');
-    expect(initialsOf('   ')).toBe('?');
   });
 });

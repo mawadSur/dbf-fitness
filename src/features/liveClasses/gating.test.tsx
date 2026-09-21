@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Linking } from 'react-native';
+import { Linking, StyleSheet } from 'react-native';
 import * as SafeArea from 'react-native-safe-area-context';
 import type { ReactElement } from 'react';
 
@@ -407,8 +407,11 @@ describe('schedule class form', () => {
       const scroll = screen.getByTestId('schedule-form-scroll');
       expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
       // With a 34pt home-indicator inset the bottom padding must stay 24 (no double inset).
-      expect(scroll.props.contentContainerStyle.paddingBottom).toBe(24);
-      expect(scroll.props.contentContainerStyle.paddingTop).toBe(47 + 8);
+      const content = StyleSheet.flatten(scroll.props.contentContainerStyle);
+      expect(content.paddingBottom).toBe(24);
+      // ScreenShell pays the status-bar inset once, on the shell itself.
+      const shell = StyleSheet.flatten(screen.getByTestId('schedule-form').props.style);
+      expect(shell.paddingTop).toBe(47);
     } finally {
       // The jest mock's own default is zero insets; restore it explicitly (mockRestore would blank it).
       insetsMock.mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
@@ -423,7 +426,8 @@ describe('schedule class form', () => {
 
     await fireEvent.press(await screen.findByLabelText('Schedule class'));
     expect(await screen.findByText('Enter a class title.')).toBeTruthy();
-    expect(screen.getByText(/YYYY-MM-DD/, { exact: false })).toBeTruthy();
+    // Plain words, matching the field hint — no format jargon in member-facing copy.
+    expect(screen.getByText('Use year-month-day, like 2026-10-03.')).toBeTruthy();
     expect(createLiveClass).not.toHaveBeenCalled();
 
     await fireEvent.changeText(screen.getByLabelText('Class title'), 'Sunrise Mobility');
@@ -443,8 +447,8 @@ describe('schedule class form', () => {
     (fetchCurrentMember as jest.Mock).mockResolvedValue(DANA);
     await renderWithQuery(<NewClassScreen />);
     await fireEvent.changeText(await screen.findByLabelText('Class title'), 'Old');
-    await fireEvent.changeText(screen.getByLabelText('Class date, year-month-day'), '2020-01-01');
-    await fireEvent.changeText(screen.getByLabelText('Class start time'), '10:00');
+    await fireEvent.changeText(screen.getByLabelText('Date'), '2020-01-01');
+    await fireEvent.changeText(screen.getByLabelText('Start time'), '10:00');
     await fireEvent.press(screen.getByLabelText('Schedule class'));
     expect(await screen.findByText('Pick a time in the future.')).toBeTruthy();
     expect(createLiveClass).not.toHaveBeenCalled();

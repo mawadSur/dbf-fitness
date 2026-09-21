@@ -50,7 +50,8 @@ export function validateScheduleForm(values: ScheduleFormValues, now: Date = new
   else if (title.length > TITLE_MAX_LENGTH) errors.title = `Keep the title under ${TITLE_MAX_LENGTH} characters.`;
 
   const date = parseDateInput(values.date);
-  if (!date) errors.date = 'Use the date format YYYY-MM-DD, e.g. 2026-10-03.';
+  // Plain words, and the same words as the field's hint — "YYYY-MM-DD" is jargon.
+  if (!date) errors.date = 'Use year-month-day, like 2026-10-03.';
   const time = parseTimeInput(values.time);
   if (!time) errors.time = 'Use a time like 18:00 or 6:00 pm.';
 

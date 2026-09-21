@@ -7,6 +7,7 @@ import { DeleteAccountPanel } from './DeleteAccountPanel';
 import { DeleteAccountError } from '../../features/account/api';
 import * as accountApi from '../../features/account/api';
 import { supabase } from '../../services/supabase/client';
+import { BOTH_THEMES, colorsFor, flattenStyle, renderInTheme } from '../ui/testing';
 
 const mockRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: jest.fn(() => true) };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
@@ -64,6 +65,30 @@ describe('DeleteAccountPanel — collapsed', () => {
     expect(screen.queryByLabelText('Your password')).toBeNull();
     expect(screen.queryByLabelText('Permanently delete')).toBeNull();
     expect(onDelete).not.toHaveBeenCalled();
+  });
+
+  /**
+   * In the danger zone this button sits directly under "Sign out" and "Change
+   * coach". It used to be a plain `secondary`, so all three had the same
+   * neutral outline and the same text colour and the only thing marking the
+   * irreversible one was a trash glyph.
+   */
+  it.each(BOTH_THEMES)('carries the danger tone, not the neutral outline, in %s', async (scheme) => {
+    await renderInTheme(
+      <DeleteAccountPanel
+        role="member"
+        memberCount={null}
+        onDelete={jest.fn()}
+        onDeleted={jest.fn()}
+      />,
+      scheme,
+    );
+    const colors = colorsFor(scheme);
+    const style = flattenStyle(screen.getByLabelText('Delete account').props.style);
+    expect(style.borderColor).toBe(colors.danger);
+    // …and NOT the neutral outline a benign `secondary` (Sign out) wears.
+    expect(style.borderColor).not.toBe(colors.text);
+    expect(flattenStyle(screen.getByText('Delete account').props.style).color).toBe(colors.danger);
   });
 
   it('tells the parent when it opens, so the member count is fetched lazily', async () => {

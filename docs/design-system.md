@@ -111,6 +111,30 @@ Light cards are white on white: they are separated by the `border-soft`
 hairline plus `shadow-sm`, never by fill alone. Dark cards are tonal and need no
 shadow.
 
+### A disabled control is re-coloured, never faded
+
+`Button` keeps its shape when disabled — a filled variant stays filled, an
+outlined one stays outlined — and swaps its colours for `text-muted` on
+`bg-soft` (with `border-soft` where the variant had a border). It carries **no
+blanket opacity**.
+
+A single `opacity: 0.45` on the whole control looks fine in light mode and
+fails in dark. Both the fill and the label fade toward the page by the same
+alpha, so the bright dark-mode `cta` (#34D399) and the near-black `onCta`
+(#022C22) collapse toward `bg` (#011A14) and meet in the middle: the disabled
+"Sign in" / "Create account" / "Upload recording" label measured (14,80,59) on
+(24,108,79) = **1.48:1** on the Android emulator. `text-muted` on `bg-soft` is
+in the contrast table above, so the disabled state is ≥ 4.5:1 in both themes
+and `accessibilityState.disabled` still announces it. A *loading* button keeps
+its own colours, because the spinner is drawn in the variant's content colour.
+
+### Destructive actions carry the danger tone
+
+`danger` is the filled, armed action ("Permanently delete"). `danger-outline`
+is the same tone as an outline, for the ENTRY to a destructive flow: it is what
+"Delete account" wears so it cannot be mistaken for the benign `secondary`
+"Sign out" and "Change coach" sitting directly above it in the danger zone.
+
 ## 3. Typography
 
 React Native does not synthesise bold, so every weight is its own family. Use
@@ -183,13 +207,19 @@ change.
 
 ### Screens that are not migrated yet
 
+**There are none left.** Stage 2 moved every reachable screen onto `useTheme()`,
+so the light-palette pins are gone with it. The rule that produced them is worth
+keeping, because it applies to any screen added from here on:
+
 A design-system component draws its own ink but NOT its own page background, so
-dropping one onto a screen that still paints a hard-coded light background
-breaks in dark mode. `ScoreRing` hit exactly that: on the home screen the ring's
-number came out `#ECFDF5` on `#FFFFFF` (1.05:1 — invisible). Until such a screen
-moves to `useTheme()`, its adapter pins the palette:
-`<ProgressRing … palette={lightTheme} />`. Remove the pin in the same change
-that migrates the screen.
+dropping one onto a screen that paints a hard-coded light background breaks in
+dark mode. `ScoreRing` hit exactly that: on the home screen the ring's number
+came out `#ECFDF5` on `#FFFFFF` (1.05:1 — invisible). The fix is to theme the
+screen, never to pin the component: `src/components/ScoreRing.tsx` and
+`src/components/ChecklistRow.tsx` survive only as `@deprecated` prop-compatible
+adapters over `ui/ProgressRing` and `ui/ChecklistRow`, and both follow the theme.
+A new screen paints its page from `useTheme()` (normally by composing
+`ScreenShell`) before it uses any ui component.
 
 ### Tab bar geometry
 
@@ -213,30 +243,54 @@ that migrates the screen.
   printable ASCII character, measured from the shipped Inter Medium/SemiBold
   `.ttf`s and re-verified against them by `src/components/ui/fontMetrics.test.ts`;
   `wrapLabel()` then breaks the label greedily the way the platforms do.
-- The label carries `maxFontSizeMultiplier={TAB_BAR_LABEL_MAX_FONT_SCALE}`
-  (150%), not the app-wide 200%. At 200% "Community" is 134pt of glyphs and the
-  greedy break puts "Com" on line one and tail-truncates "muni…" on line two —
-  two 74pt lines simply cannot hold it. At 150% it breaks "Commu"/"nity" and
-  clears even a 360pt phone with ~17% to spare. Everything else in the app
+- The label carries `maxFontSizeMultiplier={labelScale}` — the smaller of
+  `TAB_BAR_LABEL_MAX_FONT_SCALE` (150%, never the app-wide 200%) and
+  `tabBarLabelFitScale(barWidth, tabCount, label)`, **the largest scale at
+  which the label still fits ONE line**. A tab label is a single word, so the
+  only break the platform can make is BETWEEN LETTERS: at 150% "Community"
+  breaks "Commu"/"nity", which clips nothing but reads as a rendering fault
+  next to four single-line neighbours (measured on the Android emulator at
+  font_scale 2.0). The fit cap is ~101% on 360pt, ~110% on 390pt and ~116% on
+  412pt — modest growth, but the whole word on one line at every OS text size.
+  It never goes below 100%: a bar too narrow for the label at 12pt falls back
+  to the two-line box rather than sub-12pt glyphs. Everything else in the app
   still scales to 200%, and the full name stays in the tab's
-  `accessibilityLabel`.
+  `accessibilityLabel` at any size.
 - The **line count follows the measured fit**, not a bare "text was scaled"
   threshold: `tabBarLabelLines(fontScale, barWidth, tabCount, longestLabel)`.
   A 412pt phone keeps one line (and a 62pt bar) at 105%, where the old
   `scale > 1` rule spent 19pt of a 640pt screen on a second line nothing used.
 
-### App chrome on unmigrated screens
+### App chrome
 
-The status bar and the tab bar sit on top of whatever the screen paints, so
-they follow the SCREEN, not the member's theme. While `LEGACY_SCREENS_ARE_LIGHT`
-is true (`src/theme/chrome.ts`), `chromeScheme()` pins both to the light
-palette: with the OS in night mode the app used to draw white status-bar glyphs
-over the hard-coded white page — the measured top band of the Android home
-screen was 100% (255,255,255), i.e. no clock, wifi or battery at all — and a
-`rgba(1,26,20,0.9)` tab bar under the same white page. `DbfTabBar` itself still
-follows the theme (gallery, tests); `AppTabBar` is the pinned mount. The dev
-gallery is the one screen that really paints dark, so it declares its own
-`<StatusBar>`. One flag turns all of this off the day the screens migrate.
+The status bar, the tab bar and the root session spinner sit on top of whatever
+the screen paints, so they have to agree with the SCREEN. Now that every screen
+follows `useTheme()`, so do all three — `AppTabBar` passes the resolved scheme
+straight to `DbfTabBar`, `ThemedStatusBar` calls `statusBarStyle(scheme)`, and
+the web session gate paints `themes[scheme]`.
+
+`src/theme/chrome.ts` is down to `statusBarStyle()`, the one rule that never
+depended on the migration: glyphs contrast with the surface behind them. The
+`LEGACY_SCREENS_ARE_LIGHT` / `chromeScheme()` pin is **removed**, and
+`chrome.test.ts` asserts it has not come back. It existed because with the OS in
+night mode the app drew white status-bar glyphs over the hard-coded white page —
+the measured top band of the Android home screen was 100% (255,255,255), i.e. no
+clock, wifi or battery at all — and a `rgba(1,26,20,0.9)` tab bar under the same
+white page. Re-introducing a pin would silently make dark mode light again for
+all three surfaces at once. The dev gallery still declares its own `<StatusBar>`
+because it forces a scheme rather than reading the member's preference.
+
+**No route turns on the native stack header.** It is the one piece of chrome
+that cannot read `useTheme()`, so a route that shows it gets a hard-white bar
+in dark mode whatever the page behind it paints — and the light status-bar
+glyphs `statusBarStyle('dark')` asks for vanish into it. Calendar was the last
+such route (`presentation: 'modal', headerShown: true, title: 'Calendar'`): its
+top band measured rgb(255,255,255) against the dark-emerald page, with no
+clock, wifi or battery, and in light mode it showed a system-font title and a
+grey hairline where every other screen shows the letter-spaced eyebrow and
+Manrope heading. Every screen now draws its own `ScreenHeader` inside a
+`ScreenShell`, which pays the status-bar inset exactly once;
+`rootLayout.test.tsx` asserts no `Stack.Screen` sets `headerShown`.
 
 ## 6. Brand assets
 

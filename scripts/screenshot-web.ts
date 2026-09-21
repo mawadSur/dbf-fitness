@@ -18,8 +18,11 @@ const DEMO_COACH_EMAIL = 'coach@dbf.demo';
 const DEMO_PASSWORD = 'password123';
 const DAY_1_ID = '44444444-4444-4444-4444-444444444401';
 const DAY_1_FIRST_EXERCISE_LABEL = 'High Knees';
-const MEMBER_NAME = 'Jordan Lee';
+// Jordan Lee (DEMO_EMAIL) and Sam Rivera share group 77777777-…, so each one's
+// roster card is `person-<the other's id>`.
+const MEMBER_ID = '22222222-2222-2222-2222-222222222222';
 const SAM_EMAIL = 'sam@dbf.demo';
+const SAM_ID = '66666666-6666-6666-6666-666666666666';
 const SAM_NAME = 'Sam Rivera';
 const LIVE_CLASS_ID = '88888888-8888-8888-8888-888888888888';
 const LIVE_CLASS_TITLE = 'Saturday Conditioning';
@@ -184,11 +187,12 @@ async function gotoAndSnap(page: Page, urlPath: string, file: string): Promise<v
 // authenticated screenshot must happen after this sign-in flow.
 async function signIn(page: Page, email: string): Promise<void> {
   await page.goto(`${BASE_URL}/sign-in`, { waitUntil: 'networkidle', timeout: 60_000 });
-  await page.getByPlaceholder('Email').fill(email);
-  await page.getByPlaceholder('Password').fill(DEMO_PASSWORD);
-  // The screen title and the submit button both render the exact text "Sign
-  // in" — the button is the later one in DOM order.
-  await page.getByText('Sign in', { exact: true }).last().click();
+  // Driven by testID (react-native-web emits it as data-testid), not by
+  // placeholder or visible text: the redesigned `AuthField` has a visible label
+  // and NO placeholder, and the header renders the same words as the button.
+  await page.getByTestId('sign-in-email').fill(email);
+  await page.getByTestId('sign-in-password').fill(DEMO_PASSWORD);
+  await page.getByTestId('sign-in-submit').click();
   await page.waitForURL(`${BASE_URL}/`, { timeout: 30_000 });
   await page.waitForLoadState('networkidle');
 }
@@ -204,15 +208,21 @@ async function signOut(page: Page): Promise<void> {
 
 // The roster fetch and presence subscription resolve after network idle, so
 // wait for the given person's row (its accessible name starts with their name).
-async function openCommunity(page: Page, rosterName: string): Promise<void> {
+async function openCommunity(page: Page, memberId: string): Promise<void> {
   await page.goto(`${BASE_URL}/community`, { waitUntil: 'networkidle', timeout: 60_000 });
-  await personRow(page, rosterName).waitFor({ timeout: 30_000 });
+  await personCard(page, memberId).waitFor({ timeout: 30_000 });
 }
 
-function personRow(page: Page, name: string, presence?: 'online' | 'offline'): Locator {
-  return page.getByRole('button', {
-    name: presence ? `${name}, ${presence}. Show actions` : new RegExp(`^${name},`),
-  });
+// The redesigned roster row (src/components/community/PersonRow.tsx) is a Card
+// with testID `person-<memberId>`, not a pressable that opens a hidden menu —
+// Report/Block are always visible inside it, and presence is a dot plus the
+// word rendered by PresenceLabel (testID presence-online/presence-offline).
+function personCard(page: Page, memberId: string): Locator {
+  return page.getByTestId(`person-${memberId}`);
+}
+
+function personPresence(page: Page, memberId: string, presence: 'online' | 'offline'): Locator {
+  return personCard(page, memberId).getByTestId(`presence-${presence}`);
 }
 
 async function openLiveClass(page: Page, urlPath: string, title: string): Promise<void> {
@@ -234,8 +244,14 @@ async function waitOrFind(locator: Locator, failure: string): Promise<boolean> {
 }
 
 async function joinLiveClass(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Join', exact: true }).click();
+  await joinClassButton(page).click();
   await page.getByText('Camera preview (mock)').first().waitFor({ timeout: 30_000 });
+}
+
+// src/components/live/ClassJoinPanel.tsx labels the action "Join class" (its
+// accessible name is the same string), so the old exact "Join" never matches.
+function joinClassButton(page: Page): Locator {
+  return page.getByRole('button', { name: 'Join class', exact: true });
 }
 
 // The inner ScrollView is what scrolls (fullPage cannot see into it), and the
@@ -244,7 +260,7 @@ async function joinLiveClass(page: Page): Promise<void> {
 // ancestor of Leave to its end (rather than just revealing the button) so the
 // content's bottom padding shows instead of the button touching the tab bar.
 async function scrollClassRoomIntoView(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Leave', exact: true }).evaluate((leave) => {
+  await page.getByTestId('call-controls-leave').evaluate((leave) => {
     for (let node = leave.parentElement; node; node = node.parentElement) {
       const scrollable =
         node.scrollHeight > node.clientHeight && getComputedStyle(node).overflowY !== 'visible';
@@ -297,28 +313,29 @@ async function capturePhase4(browser: Browser): Promise<void> {
     pages.push(jordan);
 
     // Roster with Sam offline (Sam has no open session yet).
-    await openCommunity(jordan, SAM_NAME);
-    await personRow(jordan, SAM_NAME, 'offline').waitFor({ timeout: 30_000 });
+    await openCommunity(jordan, SAM_ID);
+    await personPresence(jordan, SAM_ID, 'offline').waitFor({ timeout: 30_000 });
     await snap(jordan, 'community-roster.png');
 
     // Sam sits on the Community tab, tracking presence on group:<id>.
     const sam = await newSignedInPage(browser, contexts, SAM_EMAIL, 'sam');
     pages.push(sam);
-    await openCommunity(sam, MEMBER_NAME);
+    await openCommunity(sam, MEMBER_ID);
     await waitOrFind(
-      personRow(jordan, SAM_NAME, 'online'),
+      personPresence(jordan, SAM_ID, 'online'),
       'Group presence: Jordan never saw Sam Online while Sam sat on the Community tab — private-channel presence is failing in a real browser'
     );
     await snap(jordan, 'community-roster-online.png');
 
     // Report flow (writes moderation_reports; reset at the end of the run).
-    await personRow(jordan, SAM_NAME).click();
-    await jordan.getByRole('button', { name: 'Report', exact: true }).click();
+    // Report/Block are always-visible buttons on the card now, and their
+    // accessible names carry the person's name so two rosters never collide.
+    await jordan.getByRole('button', { name: `Report ${SAM_NAME}`, exact: true }).click();
     await jordan.getByText(`Why are you reporting ${SAM_NAME}?`).waitFor({ timeout: 30_000 });
     await snap(jordan, 'community-report.png');
-    await jordan.getByRole('button', { name: 'Harassment', exact: true }).click();
+    await jordan.getByTestId('report-reason-Harassment').click();
     await jordan.getByRole('button', { name: 'Send report', exact: true }).click();
-    await jordan.getByText('Report sent', { exact: false }).waitFor({ timeout: 30_000 });
+    await jordan.getByTestId('report-sent').waitFor({ timeout: 30_000 });
     await snap(jordan, 'community-report-sent.png');
 
     // Live schedule and class lobby.
@@ -327,7 +344,7 @@ async function capturePhase4(browser: Browser): Promise<void> {
 
     const classPath = `/community/live/${LIVE_CLASS_ID}`;
     await openLiveClass(jordan, classPath, LIVE_CLASS_TITLE);
-    await jordan.getByRole('button', { name: 'Join', exact: true }).waitFor({ timeout: 30_000 });
+    await joinClassButton(jordan).waitFor({ timeout: 30_000 });
     await snap(jordan, 'live-class-lobby.png');
 
     // Joined alone: presence must list Jordan.
@@ -352,12 +369,11 @@ async function capturePhase4(browser: Browser): Promise<void> {
     await snap(jordan, 'live-class-joined-multi.png');
 
     // Last DB-mutating step: Jordan blocks Sam, so the roster empties out.
-    await openCommunity(jordan, SAM_NAME);
-    await personRow(jordan, SAM_NAME).click();
-    await jordan.getByRole('button', { name: 'Block', exact: true }).click();
-    // The confirm panel replaces the menu, leaving exactly one Block button.
-    await jordan.getByRole('button', { name: 'Block', exact: true }).click();
-    await jordan.getByText('No one else is in this group yet.').waitFor({ timeout: 30_000 });
+    await openCommunity(jordan, SAM_ID);
+    await jordan.getByRole('button', { name: `Block ${SAM_NAME}`, exact: true }).click();
+    // The inline confirm replaces the Report/Block row with "Yes, block".
+    await jordan.getByRole('button', { name: `Yes, block ${SAM_NAME}`, exact: true }).click();
+    await jordan.getByText('No one else here yet', { exact: true }).waitFor({ timeout: 30_000 });
     await snap(jordan, 'community-blocked-empty.png');
   } finally {
     for (const page of pages) flushPageErrors(page, '(after last screenshot)');
@@ -387,7 +403,12 @@ async function captureScreenshots(): Promise<void> {
     });
     await snap(page, 'workout-exercise-detail.png');
 
-    await page.getByText('‹ Back', { exact: true }).click();
+    // The redesign replaced the "‹ Back" text button with ScreenHeader's
+    // icon-only back control (testID screen-header-back). Expo Router keeps the
+    // day screen mounted underneath on web, so two back buttons are in the DOM
+    // — scope to this screen's ScreenShell (testID "exercise") or Playwright's
+    // strict mode rejects the click.
+    await page.getByTestId('exercise').getByTestId('screen-header-back').click();
     await page.waitForURL((url) => url.pathname === `/workout/${DAY_1_ID}`, { timeout: 30_000 });
     await page.waitForLoadState('networkidle');
 
@@ -397,14 +418,15 @@ async function captureScreenshots(): Promise<void> {
       await checkboxes.nth(i).click();
     }
 
-    await page.getByText('Finish Workout', { exact: true }).click();
+    // Button label is now "Finish workout" (lower-case w) — use its testID.
+    await page.getByTestId('finish-workout').click();
     await page.getByText('Workout complete', { exact: false }).waitFor({ timeout: 30_000 });
     // Give the milestone-toast mount/animation time to settle before capture.
     await page.waitForTimeout(1_000);
     await snap(page, 'workout-finished.png');
 
     await gotoAndSnap(page, '/food', 'tab-food.png');
-    await openCommunity(page, SAM_NAME);
+    await openCommunity(page, SAM_ID);
     await snap(page, 'tab-community.png');
     await gotoAndSnap(page, '/profile', 'tab-profile.png');
     await gotoAndSnap(page, '/calendar', 'calendar.png');

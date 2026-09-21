@@ -1,4 +1,7 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import { Icon, Text } from './ui';
+import { useOptionalTheme } from '../theme/ThemeProvider';
 
 const AFFIRMATIONS = [
   'Every workout is a deposit in your future self.',
@@ -15,12 +18,29 @@ type AffirmationCardProps = {
   message?: string;
 };
 
+/**
+ * One quiet line of encouragement.
+ *
+ * It used to be a tinted card the size of the real call to action, which is
+ * why Home led with "Progress, not perfection" instead of with the workout.
+ * The redesign demotes it to a line: same content, no visual claim on the page.
+ * The name and the `message` prop are unchanged so callers are untouched.
+ */
 export function AffirmationCard({ message }: AffirmationCardProps) {
+  const { colors } = useOptionalTheme();
   const displayMessage = message ?? randomAffirmation;
 
   return (
-    <View className="w-full rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-4">
-      <Text className="text-center text-base font-medium text-emerald-800">{displayMessage}</Text>
+    <View
+      testID="affirmation-line"
+      style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}
+    >
+      <View style={{ paddingTop: 2 }}>
+        <Icon name="heart" size={16} color={colors.brand} />
+      </View>
+      <Text role="bodySm" tone="muted" style={{ flex: 1 }}>
+        {displayMessage}
+      </Text>
     </View>
   );
 }

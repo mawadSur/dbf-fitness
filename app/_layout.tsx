@@ -13,7 +13,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '../src/services/queryClient';
 import { bindAuthAutoRefresh } from '../src/services/supabase/autoRefresh';
 import { supabase } from '../src/services/supabase/client';
-import { chromeScheme, statusBarStyle } from '../src/theme/chrome';
+import { statusBarStyle } from '../src/theme/chrome';
 import { brandFonts, FONT_LOAD_TIMEOUT_MS } from '../src/theme/fonts';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
 import { themes } from '../src/theme/tokens';
@@ -40,22 +40,21 @@ function useBrandFontsSettled(): boolean {
 }
 
 /**
- * The status bar contrasts with what the SCREEN paints, not with the member's
- * theme preference. Every product screen still hard-codes the white legacy
- * page, so following the resolved scheme drew white glyphs on white in dark
- * mode — the clock, wifi and battery simply vanished on Android. `chromeScheme`
- * is the one flag that says "the screens are still light"; when the screens
- * migrate to `useTheme()` it flips and this follows the theme again.
+ * The status bar contrasts with what the SCREEN paints. The screens now follow
+ * `useTheme()` (stage 2 migrated the last of them), so the status bar follows
+ * the resolved scheme too and `statusBarStyle` just picks the glyph colour that
+ * contrasts with it. Before that it had to be pinned light, or dark mode drew
+ * white glyphs on the white legacy page and the clock vanished on Android.
  */
 function ThemedStatusBar() {
   const { scheme } = useTheme();
-  return <StatusBar style={statusBarStyle(chromeScheme(scheme))} />;
+  return <StatusBar style={statusBarStyle(scheme)} />;
 }
 
 function RootNavigator() {
   const { scheme } = useTheme();
-  // The session gate is chrome, not content — same flag as the status/tab bar.
-  const chromeColors = themes[chromeScheme(scheme)];
+  // The session gate is chrome, not content — same palette as the status/tab bar.
+  const chromeColors = themes[scheme];
   const areFontsSettled = useBrandFontsSettled();
   const [session, setSession] = useState<Session | null>(null);
   const [isSessionReady, setIsSessionReady] = useState(false);
@@ -101,13 +100,9 @@ function RootNavigator() {
   // Native holds the real splash; expo-splash-screen is a no-op on web, so show a spinner there.
   //
   // This gate paints a full page, so it is CHROME: it has to agree with the
-  // status bar and the tab bar, which `chromeScheme` pins to light for exactly
-  // as long as the product screens hard-code the white legacy page. Following
-  // `useTheme()` here (a `bg-bg` that went emerald-950 in dark mode while the
-  // status bar stayed light and the screen behind it was white) was the same
-  // mismatch `src/theme/chrome.ts` exists to remove, plus a dark-to-white flash
-  // the moment the session resolved. One flag now drives all three, so the day
-  // the screens consume `useTheme()` the spinner follows the theme with them.
+  // status bar and the tab bar. All three follow the resolved theme now that the
+  // screens do, so the spinner page matches the screen that replaces it — no
+  // dark-to-white flash the moment the session resolves.
   if (!isSessionReady) {
     if (Platform.OS !== 'web') return null;
     return (
@@ -136,10 +131,18 @@ function RootNavigator() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="calendar"
-          options={{ presentation: 'modal', headerShown: true, title: 'Calendar' }}
-        />
+        {/*
+          NO native header. The stack header is the one piece of chrome that
+          does not read `useTheme()`, so in dark mode it drew a hard-white band
+          (measured rgb(255,255,255) at y=0..99 on the Android emulator, with
+          the light status-bar glyphs `statusBarStyle('dark')` asks for
+          invisible on top of it) and in light mode it broke the brand: a
+          system-font title and a grey hairline where every other route shows
+          the letter-spaced eyebrow + Manrope `ScreenHeader`. `app/calendar.tsx`
+          now draws that same header inside its `ScreenShell`, which pays the
+          status-bar inset itself.
+        */}
+        <Stack.Screen name="calendar" options={{ presentation: 'modal' }} />
         <Stack.Screen name="effort" />
         <Stack.Screen name="effort-review" />
         <Stack.Screen name="notes/index" />

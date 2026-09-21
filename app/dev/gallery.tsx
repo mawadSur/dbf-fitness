@@ -28,9 +28,18 @@ import {
   Skeleton,
   Text,
   type BannerTone,
+  PressableBase,
 } from '../../src/components/ui';
+import { ExercisePictogram } from '../../src/components/exercises';
 import { statusBarStyle } from '../../src/theme/chrome';
 import { useTheme } from '../../src/theme/ThemeProvider';
+
+/**
+ * Two drawings the resolver knows by name and two it does not. The unknown pair
+ * is the point: the fallbacks have to look deliberate next to a real pictogram,
+ * not like a missing asset, and that is only visible side by side.
+ */
+const PICTOGRAM_NAMES = ['Push-up', 'Bodyweight squat', 'Zercher carry', 'Sled push'];
 
 const BANNER_TONES: BannerTone[] = ['success', 'warning', 'danger', 'info'];
 
@@ -221,6 +230,67 @@ export default function GalleryScreen() {
             <ProgressRing value={5} max={30} label="Day streak" />
             <ProgressRing value={30} max={30} label="Complete" size={96} />
             <ProgressRing value={0} max={30} label="Not started" size={72} animate={false} />
+          </Row>
+        </Section>
+
+        <Section title="Exercise pictograms">
+          <Text role="bodySm" tone="muted">
+            Thumbs — the last two names are unknown, so they fall back by category.
+          </Text>
+          <Row>
+            {PICTOGRAM_NAMES.map((name) => (
+              <View key={name} style={{ alignItems: 'center', gap: 4, width: 96 }}>
+                <ExercisePictogram name={name} variant="thumb" />
+                <Text role="caption" tone="muted" align="center">
+                  {name}
+                </Text>
+              </View>
+            ))}
+          </Row>
+          <Text role="bodySm" tone="muted">
+            Hero — a known drawing and a fallback.
+          </Text>
+          <ExercisePictogram name="Push-up" variant="hero" />
+          <ExercisePictogram name="Sled push" variant="hero" />
+        </Section>
+
+        <Section title="PressableBase">
+          <Text role="bodySm" tone="muted">
+            The press primitive under Button/Card/ListRow — box styles on a static
+            object so Android keeps them, feedback computed per press.
+          </Text>
+          <Row>
+            <PressableBase
+              accessibilityRole="button"
+              onPress={() => undefined}
+              style={{
+                minHeight: 48,
+                paddingHorizontal: 16,
+                justifyContent: 'center',
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.borderSoft,
+                backgroundColor: colors.surface,
+              }}
+            >
+              <Text>Default feedback</Text>
+            </PressableBase>
+            <PressableBase
+              accessibilityRole="button"
+              onPress={() => undefined}
+              pressFeedback="none"
+              style={{
+                minHeight: 48,
+                paddingHorizontal: 16,
+                justifyContent: 'center',
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: colors.borderSoft,
+                backgroundColor: colors.surface,
+              }}
+            >
+              <Text>No feedback</Text>
+            </PressableBase>
           </Row>
         </Section>
 

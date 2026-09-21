@@ -1,49 +1,52 @@
-import { Link, useRouter } from 'expo-router';
-import { KEYBOARD_AVOIDING_BEHAVIOR } from '../../src/components/keyboard';
+import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Keyboard,
-  KeyboardAvoidingView,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Keyboard, View, type TextInput } from 'react-native';
 
+import { AuthAlert, AuthBrandHeader, AuthField, AuthSwitchLink } from '../../src/components/auth';
+import { Button, ScreenShell } from '../../src/components/ui';
+import {
+  PASSWORD_MIN_LENGTH,
+  errorBannerTitle,
+  validateEmail,
+  validateFullName,
+  validateNewPassword,
+} from '../../src/features/auth/authForm';
 import {
   FULL_NAME_MAX_LENGTH,
   describeSignUpError,
   normalizeFullName,
 } from '../../src/features/auth/signUpName';
 import { supabase } from '../../src/services/supabase/client';
-import { colors } from '../../src/theme/tokens';
-
-// slate-500: 4.7:1 on white (the old #94A3B8 was 2.6:1).
-const PLACEHOLDER_COLOR = colors.textSecondary;
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [touched, setTouched] = useState({ fullName: false, email: false, password: false });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<unknown>(null);
 
   // Exactly what the server would store (`left(btrim(name), 120)`), so the
   // profiles_text_bounds CHECK added in 20260919152000 is never reached.
   const submittedName = normalizeFullName(fullName);
+  const errors = {
+    fullName: validateFullName(fullName),
+    email: validateEmail(email),
+    password: validateNewPassword(password),
+  };
   const isSubmitDisabled = isSubmitting || !submittedName || !email || !password;
 
   const handleSubmit = async () => {
     if (isSubmitDisabled) return;
+    if (errors.fullName || errors.email || errors.password) {
+      setTouched({ fullName: true, email: true, password: true });
+      return;
+    }
     Keyboard.dismiss();
-    setErrorMessage(null);
+    setSubmitError(null);
     setIsSubmitting(true);
 
     // full_name travels in the sign-up metadata so the server-side trigger
@@ -51,14 +54,14 @@ export default function SignUpScreen() {
     // profile row itself. role and coach_id are never sent: they are assigned
     // server-side and the INSERT policy rejects anything else.
     const { data, error } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password,
       options: { data: { full_name: submittedName } },
     });
 
     if (error) {
       setIsSubmitting(false);
-      setErrorMessage(describeSignUpError(error));
+      setSubmitError(error);
       return;
     }
 
@@ -84,115 +87,87 @@ export default function SignUpScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-white"
-      behavior={KEYBOARD_AVOIDING_BEHAVIOR}
-    >
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: 'center',
-          paddingHorizontal: 24,
-          paddingTop: insets.top + 16,
-          paddingBottom: insets.bottom + 16,
-        }}
-      >
-        <View className="w-full max-w-[420px] items-center gap-4 self-center">
-          <Text accessibilityRole="header" className="text-2xl font-bold text-slate-900">
-            Create account
-          </Text>
-          <Text className="text-center text-base text-slate-600">
-            Set up your member profile to get started.
-          </Text>
+    <ScreenShell keyboardAvoiding testID="sign-up-screen">
+      <View style={{ gap: 16, paddingTop: 8, paddingBottom: 24 }}>
+        <AuthBrandHeader title="Create account" />
 
-          <View className="w-full gap-3">
-            <TextInput
-              className="min-h-[48px] w-full rounded-lg border border-slate-200 px-4 py-3 text-base text-slate-900"
-              placeholder="Full name"
-              placeholderTextColor={PLACEHOLDER_COLOR}
-              accessibilityLabel="Full name"
-              autoCapitalize="words"
-              autoComplete="name"
-              textContentType="name"
-              maxLength={FULL_NAME_MAX_LENGTH}
-              returnKeyType="next"
-              blurOnSubmit={false}
-              onSubmitEditing={() => emailRef.current?.focus()}
-              value={fullName}
-              onChangeText={setFullName}
-            />
-            <TextInput
-              ref={emailRef}
-              className="min-h-[48px] w-full rounded-lg border border-slate-200 px-4 py-3 text-base text-slate-900"
-              placeholder="Email"
-              placeholderTextColor={PLACEHOLDER_COLOR}
-              accessibilityLabel="Email"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-              textContentType="emailAddress"
-              keyboardType="email-address"
-              returnKeyType="next"
-              blurOnSubmit={false}
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              value={email}
-              onChangeText={setEmail}
-            />
-            <TextInput
-              ref={passwordRef}
-              className="min-h-[48px] w-full rounded-lg border border-slate-200 px-4 py-3 text-base text-slate-900"
-              placeholder="Password"
-              placeholderTextColor={PLACEHOLDER_COLOR}
-              accessibilityLabel="Password"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="new-password"
-              textContentType="newPassword"
-              returnKeyType="done"
-              onSubmitEditing={handleSubmit}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-            />
-          </View>
+        {submitError ? (
+          <AuthAlert
+            testID="sign-up-error"
+            tone="danger"
+            title={errorBannerTitle(submitError)}
+            message={describeSignUpError(submitError)}
+          />
+        ) : null}
 
-          {errorMessage ? (
-            <Text
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
-              className="text-center text-sm text-red-700"
-            >
-              {errorMessage}
-            </Text>
-          ) : null}
-
-          <Pressable
-            className={`min-h-[48px] w-full items-center justify-center rounded-lg py-3 ${
-              isSubmitDisabled ? 'bg-emerald-300' : 'bg-emerald-700'
-            }`}
-            disabled={isSubmitDisabled}
-            onPress={handleSubmit}
-            accessibilityRole="button"
-            accessibilityLabel="Create account"
-            accessibilityState={{
-              disabled: isSubmitDisabled,
-              busy: isSubmitting,
-            }}
-            android_ripple={{ color: colors.primaryMuted }}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text className="text-base font-semibold text-white">Create account</Text>
-            )}
-          </Pressable>
-
-          <Link href="/sign-in" className="py-3 text-base font-semibold text-emerald-700">
-            Already have an account? Sign in
-          </Link>
+        <View style={{ gap: 12 }}>
+          <AuthField
+            testID="sign-up-name"
+            label="Full name"
+            value={fullName}
+            onChangeText={setFullName}
+            error={touched.fullName ? errors.fullName : null}
+            onBlur={() => setTouched((previous) => ({ ...previous, fullName: true }))}
+            autoCapitalize="words"
+            autoComplete="name"
+            textContentType="name"
+            maxLength={FULL_NAME_MAX_LENGTH}
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => emailRef.current?.focus()}
+          />
+          <AuthField
+            testID="sign-up-email"
+            inputRef={emailRef}
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            error={touched.email ? errors.email : null}
+            onBlur={() => setTouched((previous) => ({ ...previous, email: true }))}
+            keyboardType="email-address"
+            autoComplete="email"
+            textContentType="emailAddress"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="next"
+            blurOnSubmit={false}
+            onSubmitEditing={() => passwordRef.current?.focus()}
+          />
+          <AuthField
+            testID="sign-up-password"
+            inputRef={passwordRef}
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            error={touched.password ? errors.password : null}
+            helperText={`At least ${PASSWORD_MIN_LENGTH} characters.`}
+            onBlur={() => setTouched((previous) => ({ ...previous, password: true }))}
+            secureTextEntry
+            autoComplete="new-password"
+            textContentType="newPassword"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={handleSubmit}
+          />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+        <Button
+          testID="sign-up-submit"
+          label="Create account"
+          onPress={handleSubmit}
+          fullWidth
+          disabled={isSubmitDisabled}
+          loading={isSubmitting}
+        />
+
+        <AuthSwitchLink
+          testID="sign-up-switch"
+          prompt="Have an account?"
+          action="Sign in"
+          href="/sign-in"
+        />
+      </View>
+    </ScreenShell>
   );
 }

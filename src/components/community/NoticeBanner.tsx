@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Banner } from '../ui';
 
 export type Notice = {
   tone: 'success' | 'error';
@@ -10,28 +10,19 @@ type NoticeBannerProps = {
   onDismiss: () => void;
 };
 
+/**
+ * One-line result of a join/leave/block action. It is the design system `Banner`
+ * with the community's own dismiss label, so the tone always carries an icon as
+ * well as a tint and the message is announced as an alert.
+ */
 export function NoticeBanner({ notice, onDismiss }: NoticeBannerProps) {
-  const isError = notice.tone === 'error';
-
   return (
-    <View
-      accessibilityRole="alert"
-      className={`flex-row items-center justify-between gap-3 rounded-lg border px-4 py-3 ${
-        isError ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'
-      }`}
-    >
-      <Text className={`flex-1 text-sm font-medium ${isError ? 'text-red-700' : 'text-emerald-700'}`}>
-        {notice.text}
-      </Text>
-      <Pressable
-        onPress={onDismiss}
-        accessibilityRole="button"
-        accessibilityLabel="Dismiss message"
-        android_ripple={{ color: 'rgba(15,23,42,0.12)' }}
-        className="min-h-[44px] min-w-[44px] items-center justify-center px-2 active:opacity-80"
-      >
-        <Text className={`text-sm font-semibold ${isError ? 'text-red-700' : 'text-emerald-700'}`}>Dismiss</Text>
-      </Pressable>
-    </View>
+    <Banner
+      testID="community-notice"
+      tone={notice.tone === 'error' ? 'danger' : 'success'}
+      title={notice.text}
+      onDismiss={onDismiss}
+      dismissAccessibilityLabel="Dismiss message"
+    />
   );
 }

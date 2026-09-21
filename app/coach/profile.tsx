@@ -1,28 +1,29 @@
 import { useRouter } from 'expo-router';
-import { KEYBOARD_AVOIDING_BEHAVIOR } from '../../src/components/keyboard';
-import { useState } from 'react';
-import {
-  Keyboard,
-  KeyboardAvoidingView,
-  ScrollView,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useState, type ReactNode } from 'react';
+import { Keyboard, Switch, View } from 'react-native';
 
-import { BackButton } from '../../src/components/coaching/BackButton';
-import { ErrorBlock, LoadingBlock, PrimaryButton } from '../../src/components/coaching/StateBlock';
+import { ErrorBlock, LoadingBlock } from '../../src/components/coaching/StateBlock';
 import { SpecialtyChipInput } from '../../src/components/coaching/SpecialtyChips';
 import { isStaffRole, useAccount } from '../../src/components/coaching/useAccount';
+import {
+  Banner,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  ListRow,
+  ScreenHeader,
+  ScreenShell,
+  SectionHeader,
+  Text,
+} from '../../src/components/ui';
 import { useMyCoachProfile, useSaveMyCoachProfile } from '../../src/features/coaching/hooks';
 import type { CoachProfileFieldErrors, CoachProfileInput } from '../../src/features/coaching/types';
 import { BIO_MAX, validateCoachProfile } from '../../src/features/coaching/validators';
+import { useOptionalTheme } from '../../src/theme/ThemeProvider';
 
 export default function CoachProfileScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const account = useAccount();
   const profile = useMyCoachProfile();
 
@@ -31,34 +32,18 @@ export default function CoachProfileScreen() {
     else router.replace('/(tabs)/profile');
   };
 
-  const shell = (children: React.ReactNode) => (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#F8FAFC' }}
-      behavior={KEYBOARD_AVOIDING_BEHAVIOR}
+  const shell = (children: ReactNode) => (
+    <ScreenShell
+      keyboardAvoiding
+      testID="coach-profile"
+      header={<ScreenHeader eyebrow="Coaching" title="My coach profile" onBack={goBack} />}
+      contentStyle={{ gap: 16 }}
     >
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{
-          paddingTop: insets.top + 8,
-          paddingBottom: insets.bottom + 32,
-          paddingHorizontal: 16,
-          gap: 16,
-        }}
-      >
-        <View style={{ gap: 8 }}>
-          <View style={{ alignItems: 'flex-start' }}>
-            <BackButton onPress={goBack} />
-          </View>
-          <Text accessibilityRole="header" style={{ fontSize: 26, fontWeight: '800', color: '#0F172A' }}>
-            My coach profile
-          </Text>
-        </View>
-        {children}
-      </ScrollView>
-    </KeyboardAvoidingView>
+      {children}
+    </ScreenShell>
   );
 
-  if (account.isLoading) return shell(<LoadingBlock />);
+  if (account.isLoading) return shell(<LoadingBlock label="Loading your account…" />);
 
   if (account.isError) {
     return shell(<ErrorBlock message="Could not load your account." onRetry={() => account.refetch()} />);
@@ -66,7 +51,13 @@ export default function CoachProfileScreen() {
 
   if (!account.data || !isStaffRole(account.data.role)) {
     return shell(
-      <Text style={{ fontSize: 15, color: '#334155' }}>The coach profile is for coaches and admins only.</Text>,
+      <EmptyState
+        icon="lock"
+        title="Coaches only"
+        message="The coach profile is for coaches and admins only."
+        actionLabel="Go back"
+        onAction={goBack}
+      />,
     );
   }
 
@@ -91,6 +82,7 @@ export default function CoachProfileScreen() {
 }
 
 function CoachProfileForm({ initial }: { initial: CoachProfileInput }) {
+  const { colors } = useOptionalTheme();
   const save = useSaveMyCoachProfile();
   const [bio, setBio] = useState(initial.bio);
   const [specialties, setSpecialties] = useState<string[]>(initial.specialties);
@@ -121,90 +113,72 @@ function CoachProfileForm({ initial }: { initial: CoachProfileInput }) {
 
   return (
     <>
-      <View style={{ gap: 6 }}>
-        <Text style={{ fontSize: 15, fontWeight: '600', color: '#0F172A' }}>Bio</Text>
-        <TextInput
-          value={bio}
-          onChangeText={(t) => {
-            setBio(t);
-            setSaved(false);
-          }}
-          multiline
-          textAlignVertical="top"
-          placeholder="Tell members about your coaching style"
-          placeholderTextColor="#64748B"
-          accessibilityLabel="Bio"
-          returnKeyType="next"
-          blurOnSubmit
-          style={{
-            minHeight: 120,
-            borderWidth: 1,
-            borderColor: errors.bio || overBio ? '#DC2626' : '#E2E8F0',
-            borderRadius: 10,
-            padding: 12,
-            color: '#0F172A',
-            backgroundColor: '#FFFFFF',
-          }}
-        />
-        <Text
-          testID="bio-counter"
-          accessibilityLabel={`${bioLength} of ${BIO_MAX} characters`}
-          style={{ alignSelf: 'flex-end', fontSize: 13, color: overBio ? '#B91C1C' : '#475569' }}
-        >
-          {`${bioLength}/${BIO_MAX}`}
-        </Text>
-        {errors.bio ? (
-          <Text accessibilityRole="alert" style={{ color: '#B91C1C', fontSize: 13 }}>
-            {errors.bio}
+      <Card>
+        <View style={{ gap: 12 }}>
+          <SectionHeader title="About you" subtitle="Members read this before they choose you." />
+          <Input
+            label="Bio"
+            value={bio}
+            onChangeText={(next) => {
+              setBio(next);
+              setSaved(false);
+            }}
+            multiline
+            placeholder="Tell members about your coaching style"
+            error={errors.bio}
+            returnKeyType="default"
+          />
+          <Text
+            role="caption"
+            tone={overBio ? 'danger' : 'muted'}
+            align="right"
+            testID="bio-counter"
+            accessibilityLabel={`${bioLength} of ${BIO_MAX} characters`}
+          >
+            {`${bioLength}/${BIO_MAX}`}
           </Text>
-        ) : null}
-      </View>
+        </View>
+      </Card>
 
-      <View style={{ gap: 6 }}>
-        <Text style={{ fontSize: 15, fontWeight: '600', color: '#0F172A' }}>Specialties</Text>
-        <SpecialtyChipInput
-          items={specialties}
-          onChange={(next) => {
-            setSpecialties(next);
-            setSaved(false);
-          }}
-          error={errors.specialties}
-          onSubmitEditing={() => Keyboard.dismiss()}
+      <Card>
+        <View style={{ gap: 12 }}>
+          <SectionHeader title="Specialties" subtitle="Up to eight, shown as chips on your card." />
+          <SpecialtyChipInput
+            items={specialties}
+            onChange={(next) => {
+              setSpecialties(next);
+              setSaved(false);
+            }}
+            error={errors.specialties}
+            onSubmitEditing={() => Keyboard.dismiss()}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <ListRow
+          title="Accepting members"
+          subtitle={accepting ? 'Members can choose you now.' : 'Members cannot choose you.'}
+          icon={accepting ? 'check-circle' : 'lock'}
+          trailing={
+            <Switch
+              value={accepting}
+              onValueChange={(next) => {
+                setAccepting(next);
+                setSaved(false);
+              }}
+              accessibilityLabel="Accepting members"
+              trackColor={{ true: colors.progressArc, false: colors.borderStrong }}
+              thumbColor={colors.surface}
+            />
+          }
         />
-      </View>
+      </Card>
 
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          minHeight: 44,
-          gap: 12,
-        }}
-      >
-        <Text style={{ flex: 1, fontSize: 15, fontWeight: '600', color: '#0F172A' }}>Accepting members</Text>
-        <Switch
-          value={accepting}
-          onValueChange={(v) => {
-            setAccepting(v);
-            setSaved(false);
-          }}
-          accessibilityLabel="Accepting members"
-          trackColor={{ true: '#047857', false: '#CBD5E1' }}
-        />
-      </View>
+      {saveError ? <Banner tone="danger" title={saveError} /> : null}
+      {saved ? <Banner tone="success" title="Profile saved." /> : null}
 
-      {saveError ? (
-        <Text accessibilityRole="alert" style={{ color: '#B91C1C', fontSize: 14 }}>
-          {saveError}
-        </Text>
-      ) : null}
-      {saved ? (
-        <Text accessibilityRole="alert" style={{ color: '#047857', fontSize: 14, fontWeight: '600' }}>
-          Profile saved.
-        </Text>
-      ) : null}
-      <PrimaryButton label="Save profile" busy={save.isPending} onPress={onSave} />
+      <Button label="Save profile" onPress={onSave} loading={save.isPending} fullWidth />
     </>
   );
 }

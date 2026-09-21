@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 
 import ClassScreen from '../../../app/(tabs)/community/live/[classId]';
@@ -137,6 +137,45 @@ describe('live schedule screen', () => {
     expect(screen.queryByText('boom')).toBeNull();
   });
 
+  it('holds the schedule skeleton back 300 ms, then reserves the rows while the list loads', async () => {
+    jest.useFakeTimers();
+    try {
+      let settle: (value: LiveClass[]) => void = () => {};
+      (fetchUpcomingLiveClasses as jest.Mock).mockReturnValue(
+        new Promise<LiveClass[]>((r) => (settle = r)),
+      );
+      await renderWithQuery(<ScheduleScreen />);
+
+      // A fast answer never flashes a placeholder, and it is never a bare spinner.
+      expect(screen.queryByTestId('schedule-skeleton')).toBeNull();
+      await act(async () => {
+        jest.advanceTimersByTime(300);
+      });
+      expect(screen.getByTestId('schedule-skeleton')).toBeTruthy();
+
+      settle([liveClass()]);
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+      });
+      expect(screen.queryByTestId('schedule-skeleton')).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('pull-to-refresh refetches the classes and the subscription state', async () => {
+    (fetchUpcomingLiveClasses as jest.Mock).mockResolvedValue([liveClass()]);
+    await renderWithQuery(<ScheduleScreen />);
+    await screen.findByText('Saturday Conditioning');
+
+    const before = (fetchUpcomingLiveClasses as jest.Mock).mock.calls.length;
+    const list = screen.getByTestId('live-schedule-list');
+    await act(async () => {
+      list.props.refreshControl.props.onRefresh();
+    });
+    expect((fetchUpcomingLiveClasses as jest.Mock).mock.calls.length).toBeGreaterThan(before);
+  });
+
   it('goes back to the community index', async () => {
     (fetchUpcomingLiveClasses as jest.Mock).mockResolvedValue([]);
     await renderWithQuery(<ScheduleScreen />);
@@ -152,7 +191,7 @@ describe('live class screen', () => {
     (fetchLiveClass as jest.Mock).mockResolvedValue(liveClass());
     await renderWithQuery(<ClassScreen />);
 
-    await fireEvent.press(await screen.findByText('Join'));
+    await fireEvent.press(await screen.findByText('Join class'));
 
     expect(await screen.findByText('Camera preview (mock)')).toBeTruthy();
     // Once as the local video tile, once in the presence name list.
@@ -161,7 +200,7 @@ describe('live class screen', () => {
     expect(screen.getByText('In this class (2)')).toBeTruthy();
 
     await fireEvent.press(screen.getByText('Leave'));
-    expect(await screen.findByText('Join')).toBeTruthy();
+    expect(await screen.findByText('Join class')).toBeTruthy();
     expect(screen.queryByText('Camera preview (mock)')).toBeNull();
   });
 
@@ -170,7 +209,7 @@ describe('live class screen', () => {
     (fetchLiveClass as jest.Mock).mockResolvedValue(liveClass());
     await renderWithQuery(<ClassScreen />);
 
-    await fireEvent.press(await screen.findByText('Join'));
+    await fireEvent.press(await screen.findByText('Join class'));
 
     expect(await screen.findByText(/Participant list unavailable/)).toBeTruthy();
     // The rest of the screen still works: the video tile and Leave are both there, and the
@@ -189,7 +228,7 @@ describe('live class screen', () => {
     await renderWithQuery(<ClassScreen />);
 
     expect(await screen.findByText(message)).toBeTruthy();
-    await fireEvent.press(screen.getByText('Join'));
+    await fireEvent.press(screen.getByText('Join class'));
     expect(screen.queryByText('Camera preview (mock)')).toBeNull();
   });
 
@@ -204,5 +243,57 @@ describe('live class screen', () => {
     await renderWithQuery(<ClassScreen />);
     expect(await screen.findByText(/Can't reach the server/)).toBeTruthy();
     expect(screen.queryByText('network down')).toBeNull();
+  });
+});
+
+describe('live class screen states', () => {
+  it('holds the skeleton back for 300 ms, then reserves the layout while the class loads', async () => {
+    jest.useFakeTimers();
+    try {
+      let settle: (value: LiveClass) => void = () => {};
+      (fetchLiveClass as jest.Mock).mockReturnValue(new Promise<LiveClass>((r) => (settle = r)));
+      await renderWithQuery(<ClassScreen />);
+
+      // A fast answer must never flash a placeholder.
+      expect(screen.queryByTestId('class-skeleton')).toBeNull();
+      await act(async () => {
+        jest.advanceTimersByTime(300);
+      });
+      expect(screen.getByTestId('class-skeleton')).toBeTruthy();
+
+      settle(liveClass());
+      await act(async () => {
+        jest.runOnlyPendingTimers();
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('says it is a preview when the server has no live video configured', async () => {
+    (fetchLiveClass as jest.Mock).mockResolvedValue(liveClass());
+    await renderWithQuery(<ClassScreen />);
+    // Nothing claims preview mode before a join tells us which mode we got.
+    expect(screen.queryByTestId('preview-mode')).toBeNull();
+
+    await fireEvent.press(await screen.findByText('Join class'));
+    expect(await screen.findByTestId('preview-mode')).toBeTruthy();
+    expect(screen.getAllByText('Preview mode').length).toBeGreaterThan(0);
+    expect(screen.getByText(/Nothing is broadcast/)).toBeTruthy();
+    expect(screen.getByTestId('live-stage')).toBeTruthy();
+  });
+
+  it('a failed load offers one retry that refetches both queries', async () => {
+    (fetchLiveClass as jest.Mock).mockRejectedValueOnce(new Error('network down'));
+    await renderWithQuery(<ClassScreen />);
+    await fireEvent.press(await screen.findByLabelText('Try again'));
+    expect((fetchLiveClass as jest.Mock).mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('a missing class offers the way back instead of a dead end', async () => {
+    (fetchLiveClass as jest.Mock).mockResolvedValue(null);
+    await renderWithQuery(<ClassScreen />);
+    await fireEvent.press(await screen.findByLabelText('Back to live classes'));
+    expect(mockBack).toHaveBeenCalled();
   });
 });

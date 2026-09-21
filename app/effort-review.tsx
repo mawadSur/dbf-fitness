@@ -1,19 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useState } from 'react';
+import { FlatList, RefreshControl, View } from 'react-native';
 
-import { supabase } from '../src/services/supabase/client';
 import { friendlyErrorMessage } from '../src/components/friendlyError';
-import { colors } from '../src/theme/tokens';
+import { ErrorBlock } from '../src/components/progress/ErrorBlock';
+import {
+  ReviewCard,
+  ReviewListSkeleton,
+  type ReviewRow,
+} from '../src/components/progress/ReviewCard';
+import { useDelayedVisible } from '../src/components/ui/useDelayedVisible';
+import { Banner } from '../src/components/ui/Banner';
+import { EmptyState } from '../src/components/ui/EmptyState';
+import { ScreenHeader } from '../src/components/ui/ScreenHeader';
+import { ScreenShell } from '../src/components/ui/ScreenShell';
+import { supabase } from '../src/services/supabase/client';
+import { useOptionalTheme } from '../src/theme/ThemeProvider';
 
-const SCORE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+/** Unchanged: the newest 50 completions are what a coach reviews in one sitting. */
+const REVIEW_LIMIT = 50;
 
-type AccessInfo = {
-  userId: string;
-  role: string;
-} | null;
+type AccessInfo = { userId: string; role: string } | null;
 
 type CompletionRow = {
   id: string;
@@ -22,19 +30,6 @@ type CompletionRow = {
   effort_score: number | null;
   completed_at: string;
 };
-
-type ReviewRow = CompletionRow & {
-  memberName: string;
-  dayLabel: string;
-};
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-}
 
 async function fetchAccess(): Promise<AccessInfo> {
   const { data: session } = await supabase.auth.getSession();
@@ -57,7 +52,7 @@ async function fetchCompletionsForReview(): Promise<ReviewRow[]> {
     .select('id, member_id, workout_day_id, effort_score, completed_at')
     .eq('status', 'completed')
     .order('completed_at', { ascending: false })
-    .limit(50);
+    .limit(REVIEW_LIMIT);
   if (error) throw error;
 
   const completionRows = (completions ?? []) as CompletionRow[];
@@ -74,13 +69,10 @@ async function fetchCompletionsForReview(): Promise<ReviewRow[]> {
   if (daysResult.error) throw daysResult.error;
 
   const nameById = new Map(
-    (profilesResult.data ?? []).map((profile) => [profile.id, profile.full_name as string])
+    (profilesResult.data ?? []).map((profile) => [profile.id, profile.full_name as string]),
   );
   const dayById = new Map(
-    (daysResult.data ?? []).map((day) => [
-      day.id,
-      `Day ${day.day_number} · ${day.block_name}` as string,
-    ])
+    (daysResult.data ?? []).map((day) => [day.id, `Day ${day.day_number} · ${day.block_name}`]),
   );
 
   return completionRows.map((row) => ({
@@ -93,7 +85,7 @@ async function fetchCompletionsForReview(): Promise<ReviewRow[]> {
 export default function EffortReviewScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const insets = useSafeAreaInsets();
+  const { tokens } = useOptionalTheme();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const accessQuery = useQuery({
@@ -148,186 +140,93 @@ export default function EffortReviewScreen() {
     }
   };
 
-  if (accessQuery.isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
+  const showAccessSkeleton = useDelayedVisible(accessQuery.isLoading);
+  const showListSkeleton = useDelayedVisible(completionsQuery.isLoading);
+  const savingId = scoreMutation.isPending ? scoreMutation.variables?.completionId : undefined;
 
-  if (accessQuery.isError) {
-    return (
-      <View className="flex-1 bg-white px-6" style={{ paddingTop: insets.top + 8 }}>
-        <BackLink onPress={goBack} />
-        <View className="flex-1 items-center justify-center gap-2">
-          <Text accessibilityRole="alert" className="text-center text-base text-red-700">
-            {friendlyErrorMessage(accessQuery.error, 'Could not check your access.')}
-          </Text>
-          <RetryButton onPress={() => accessQuery.refetch()} />
-        </View>
-      </View>
-    );
-  }
+  const renderItem = useCallback(
+    ({ item }: { item: ReviewRow }) => (
+      <ReviewCard
+        row={item}
+        isSaving={savingId === item.id}
+        onSelectScore={(effortScore) =>
+          scoreMutation.mutate({ completionId: item.id, effortScore })
+        }
+      />
+    ),
+    [savingId, scoreMutation],
+  );
 
-  if (!isCoach) {
+  const header = <ScreenHeader eyebrow="Coaching" title="Effort review" onBack={goBack} />;
+
+  if (accessQuery.isLoading || accessQuery.isError || !isCoach) {
     return (
-      <View className="flex-1 bg-white px-6" style={{ paddingTop: insets.top + 8 }}>
-        <BackLink onPress={goBack} />
-        <View className="flex-1 items-center justify-center gap-4">
-          <Text className="text-center text-base text-slate-600">
-            This screen is only available to coaches.
-          </Text>
-        </View>
-      </View>
+      <ScreenShell testID="effort-review" header={header} contentStyle={{ gap: tokens.space.lg }}>
+        {accessQuery.isError ? (
+          <ErrorBlock
+            message={friendlyErrorMessage(accessQuery.error, 'Could not check your access.')}
+            onRetry={() => accessQuery.refetch()}
+          />
+        ) : accessQuery.isLoading ? (
+          showAccessSkeleton ? (
+            <ReviewListSkeleton count={2} />
+          ) : null
+        ) : (
+          // No second "Go back" here: the header already owns that action, and two
+          // controls with the same name is one ambiguous target for a screen reader.
+          <EmptyState
+            icon="lock"
+            title="Coaches only"
+            message="This screen is only available to coaches."
+            actionLabel="Go to your workouts"
+            onAction={() => router.replace('/workout')}
+          />
+        )}
+      </ScreenShell>
     );
   }
 
   const rows = completionsQuery.data ?? [];
 
   return (
-    <FlatList
-      className="flex-1 bg-white"
-      data={completionsQuery.isLoading || completionsQuery.isError ? [] : rows}
-      keyExtractor={(row) => row.id}
-      contentContainerClassName="gap-3 px-6"
-      contentContainerStyle={{
-        paddingTop: insets.top + 8,
-        paddingBottom: insets.bottom + 24,
-      }}
-      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
-      ListHeaderComponent={
-        <View className="gap-4 pb-1">
-          <BackLink onPress={goBack} />
-          <Text accessibilityRole="header" className="text-2xl font-bold text-slate-900">
-            Effort Review
-          </Text>
-        </View>
-      }
-      ListEmptyComponent={
-        completionsQuery.isLoading ? (
-          <ActivityIndicator color={colors.primary} />
-        ) : completionsQuery.isError ? (
-          <View className="items-center gap-2">
-            <Text accessibilityRole="alert" className="text-center text-sm text-red-700">
-              {friendlyErrorMessage(completionsQuery.error, 'Could not load completions.')}
-            </Text>
-            <RetryButton onPress={() => completionsQuery.refetch()} />
-          </View>
-        ) : (
-          <Text className="text-sm text-slate-600">No completed workouts to review yet.</Text>
-        )
-      }
-      ListFooterComponent={
-        scoreMutation.isError ? (
-          <Text
-            accessibilityRole="alert"
-            accessibilityLiveRegion="polite"
-            className="pt-3 text-center text-sm text-red-700"
-          >
-            {friendlyErrorMessage(scoreMutation.error, 'Could not save that score.')}
-          </Text>
-        ) : null
-      }
-      renderItem={({ item: row }) => (
-        <CompletionCard
-          row={row}
-          isSaving={scoreMutation.isPending && scoreMutation.variables?.completionId === row.id}
-          onSelectScore={(effortScore) =>
-            scoreMutation.mutate({ completionId: row.id, effortScore })
-          }
-        />
-      )}
-    />
-  );
-}
-
-function BackLink({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-      android_ripple={{ color: colors.primaryMuted }}
-      className="min-h-[44px] justify-center self-start pr-4"
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-    >
-      <Text className="text-base font-semibold text-emerald-700">‹ Back</Text>
-    </Pressable>
-  );
-}
-
-function RetryButton({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel="Try again"
-      android_ripple={{ color: colors.primaryMuted }}
-      className="min-h-[44px] items-center justify-center px-4"
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-    >
-      <Text className="text-base font-semibold text-emerald-700">Try again</Text>
-    </Pressable>
-  );
-}
-
-function CompletionCard({
-  row,
-  isSaving,
-  onSelectScore,
-}: {
-  row: ReviewRow;
-  isSaving: boolean;
-  onSelectScore: (effortScore: number) => void;
-}) {
-  return (
-    <View className="gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <View className="flex-row items-center justify-between gap-3">
-        <View className="flex-1">
-          <Text numberOfLines={1} className="text-sm font-medium text-slate-900">
-            {row.memberName}
-          </Text>
-          <Text numberOfLines={2} className="text-xs text-slate-600">
-            {row.dayLabel} · {formatDate(row.completed_at)}
-          </Text>
-        </View>
-        <Text className="text-sm font-semibold text-emerald-700">
-          {row.effort_score != null ? `${row.effort_score}/10` : 'Not scored'}
-        </Text>
-      </View>
-
-      <View className="flex-row flex-wrap gap-2">
-        {SCORE_OPTIONS.map((option) => {
-          const isSelected = row.effort_score === option;
-          return (
-            <Pressable
-              key={option}
-              disabled={isSaving}
-              onPress={() => onSelectScore(option)}
-              accessibilityRole="button"
-              accessibilityLabel={`Score ${row.memberName} ${option} out of 10`}
-              accessibilityState={{ selected: isSelected, disabled: isSaving }}
-              android_ripple={{ color: colors.primaryMuted, borderless: true }}
-              className={`h-11 w-11 items-center justify-center rounded-full ${
-                isSelected ? 'bg-emerald-700' : 'border border-slate-300 bg-white'
-              } ${isSaving ? 'opacity-50' : ''}`}
-            >
-              <Text
-                className={`text-sm font-semibold ${isSelected ? 'text-white' : 'text-slate-700'}`}
-              >
-                {option}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {isSaving ? (
-        <Text accessibilityLiveRegion="polite" className="text-xs text-slate-600">
-          Saving…
-        </Text>
-      ) : null}
-    </View>
+    <ScreenShell testID="effort-review" scroll={false} header={header}>
+      <FlatList
+        testID="effort-review-list"
+        data={completionsQuery.isLoading || completionsQuery.isError ? [] : rows}
+        keyExtractor={(row) => row.id}
+        renderItem={renderItem}
+        contentContainerStyle={{ gap: tokens.space.md, paddingBottom: tokens.space.xl }}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />}
+        ListHeaderComponent={
+          scoreMutation.isError ? (
+            <View style={{ paddingBottom: tokens.space.md }}>
+              <Banner
+                tone="danger"
+                title={friendlyErrorMessage(scoreMutation.error, 'Could not save that score.')}
+                message="The score was not saved. Tap a number to try again."
+              />
+            </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          completionsQuery.isError ? (
+            <ErrorBlock
+              message={friendlyErrorMessage(completionsQuery.error, 'Could not load completions.')}
+              onRetry={() => completionsQuery.refetch()}
+            />
+          ) : completionsQuery.isLoading ? (
+            showListSkeleton ? (
+              <ReviewListSkeleton />
+            ) : null
+          ) : (
+            <EmptyState
+              icon="clock"
+              title="Nothing to review yet"
+              message="Completed workouts show up here as soon as your members log them."
+            />
+          )
+        }
+      />
+    </ScreenShell>
   );
 }

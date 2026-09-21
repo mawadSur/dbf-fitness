@@ -140,6 +140,39 @@ export const tabBarBackground: Record<ThemeName, string> = {
   dark: 'rgba(1, 26, 20, 0.9)',
 };
 
+/**
+ * The one dark scrim used by video surfaces — the only colours in the product
+ * that deliberately ignore `useTheme()`.
+ *
+ * Camera output is photographic, so its container must NOT flip with the theme:
+ * a white tile frame around a dark video feed glares in a dim gym and washes the
+ * picture out in daylight. So these are FIXED (identical in light and dark)
+ * rather than `ThemeColors` entries, and they are the only values any live-video
+ * box may use.
+ *
+ * Contrast (WCAG 2.1, non-text and text):
+ *   scrim  #04120E  vs  onScrim        #F5FFFB  → 17.4:1
+ *   scrim  #04120E  vs  onScrimMuted   #9FD6C3  →  9.4:1
+ *   tile   #0B241D  vs  onScrim        #F5FFFB  → 14.0:1
+ * so overlay captions stay legible over any frame the camera happens to show.
+ */
+export const videoSurface = {
+  /** Background of the whole video stage. */
+  scrim: '#04120E',
+  /** One participant tile, one step lighter so tile edges read against the stage. */
+  tile: '#0B241D',
+  /** Hairline between touching tiles. */
+  tileBorder: '#123A2E',
+  /** Primary text/icon colour on the scrim. */
+  onScrim: '#F5FFFB',
+  /** Secondary text on the scrim (captions, "waiting…"). */
+  onScrimMuted: '#9FD6C3',
+  /** Gradient-free caption plate so a name stays readable over a bright frame. */
+  captionPlate: 'rgba(4, 18, 14, 0.72)',
+} as const;
+
+export type VideoSurfaceToken = keyof typeof videoSurface;
+
 /** One family name per weight: React Native does not synthesise bold. */
 export const fontFamily = {
   heading: 'Manrope_800ExtraBold',

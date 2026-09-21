@@ -1,18 +1,6 @@
-import { LEGACY_SCREENS_ARE_LIGHT, chromeScheme, statusBarStyle } from './chrome';
+import * as chrome from './chrome';
+import { statusBarStyle } from './chrome';
 import { themes } from './tokens';
-
-describe('chrome scheme', () => {
-  it('keeps the chrome on the light palette while the screens hard-code white', () => {
-    expect(LEGACY_SCREENS_ARE_LIGHT).toBe(true);
-    expect(chromeScheme('dark')).toBe('light');
-    expect(chromeScheme('light')).toBe('light');
-  });
-
-  it('follows the theme again the day the screens are migrated', () => {
-    expect(chromeScheme('dark', false)).toBe('dark');
-    expect(chromeScheme('light', false)).toBe('light');
-  });
-});
 
 describe('status bar style', () => {
   it('draws dark glyphs on a light page and light glyphs on a dark one', () => {
@@ -21,13 +9,35 @@ describe('status bar style', () => {
   });
 
   /*
-   * The bug: with the OS in night mode the resolved scheme was 'dark', so the
-   * status bar drew WHITE glyphs — on a page that is still #FFFFFF. The top
-   * band of the Android home screen measured 100% (255,255,255): clock, wifi
-   * and battery were gone. Contrast is release-blocking (DESIGN-SYSTEM.md §66).
+   * The original bug: with the OS in night mode the resolved scheme was 'dark',
+   * so the status bar drew WHITE glyphs — on a page that was still #FFFFFF. The
+   * top band of the Android home screen measured 100% (255,255,255): clock, wifi
+   * and battery were gone. Contrast is release-blocking (design-system.md).
+   *
+   * Now that the screens follow the theme, the guarantee is the general one:
+   * whatever scheme the chrome resolves to, the glyphs contrast with THAT
+   * scheme's page background.
    */
-  it('never puts white glyphs over the white legacy page', () => {
-    expect(themes[chromeScheme('dark')].bg).toBe('#FFFFFF');
-    expect(statusBarStyle(chromeScheme('dark'))).toBe('dark');
+  it.each(['light', 'dark'] as const)('contrasts with the %s page it sits on', (scheme) => {
+    const pageIsDark = themes[scheme].bg !== '#FFFFFF';
+    expect(statusBarStyle(scheme)).toBe(pageIsDark ? 'light' : 'dark');
+  });
+});
+
+describe('the legacy light pin', () => {
+  /*
+   * Stage 2 migrated every reachable screen onto `useTheme()`, so the chrome no
+   * longer overrides the resolved scheme. These assert the concept is GONE, not
+   * merely flipped to false: a re-introduced pin would silently make dark mode
+   * light again for the status bar, tab bar and root spinner all at once.
+   */
+  it('no longer exists', () => {
+    expect('LEGACY_SCREENS_ARE_LIGHT' in chrome).toBe(false);
+    expect('chromeScheme' in chrome).toBe(false);
+  });
+
+  it('leaves the chrome following the theme', () => {
+    expect(themes.dark.bg).not.toBe('#FFFFFF');
+    expect(statusBarStyle('dark')).toBe('light');
   });
 });

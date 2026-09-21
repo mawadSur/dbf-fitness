@@ -1,9 +1,10 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { billingUrl, CONTACT_COACH_TO_RENEW, openBilling } from '../../features/liveClasses/billing';
 import { graceBannerText, graceNoticeFacts } from '../../features/liveClasses/graceCopy';
 import { graceReminderCopy, type SubscriptionInfo } from '../../features/subscriptions/state';
-import { LiveButton } from './LiveButton';
+import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { Banner, Button, Card, Icon, Text } from '../ui';
 
 /** Pre-join payment reminder for a member in the grace window. Shown on EVERY join. */
 export function GraceNotice({
@@ -18,54 +19,59 @@ export function GraceNotice({
   onDismiss?: () => void;
   joining?: boolean;
 }) {
+  const { colors, tokens } = useOptionalTheme();
   const copy = graceReminderCopy(info);
   const facts = graceNoticeFacts(info);
   const hasBilling = billingUrl() !== null;
 
   return (
-    <View accessibilityRole="alert" className="gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4">
-      <Text className="text-base font-bold text-amber-900">{copy.title}</Text>
-      <View className="gap-1">
+    <Card testID="grace-notice" tone="raised" style={{ gap: tokens.space.md }}>
+      <Banner tone="warning" title={copy.title} message={copy.body} />
+
+      <View style={{ gap: tokens.space.xs }}>
         {facts.map((fact) => (
-          <Text key={fact} className="text-sm font-semibold text-amber-900">
-            {fact}
-          </Text>
+          <View key={fact} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Icon name="clock" size={16} color={colors.warning} />
+            <Text role="labelSm" tone="warning">
+              {fact}
+            </Text>
+          </View>
         ))}
       </View>
-      <Text className="text-sm text-amber-900">{copy.body}</Text>
+
       {hasBilling ? (
-        <LiveButton label="Renew now" onPress={() => void openBilling()} />
+        <Button label="Renew now" onPress={() => void openBilling()} trailingIcon="external-link" />
       ) : (
-        <Text className="text-sm font-medium text-amber-900">{CONTACT_COACH_TO_RENEW}</Text>
+        <Text role="bodySm" tone="warning">
+          {CONTACT_COACH_TO_RENEW}
+        </Text>
       )}
-      <LiveButton
+      <Button
         label={joining ? 'Joining…' : 'Join anyway'}
         variant="secondary"
         onPress={onJoinAnyway}
-        busy={joining}
+        loading={joining}
       />
       {onDismiss ? (
-        <LiveButton label="Not now" variant="ghost" onPress={onDismiss} disabled={joining} />
+        <Button label="Not now" variant="ghost" onPress={onDismiss} disabled={joining} />
       ) : null}
-    </View>
+    </Card>
   );
 }
 
 /** Persistent in-call banner. Sits in normal flow above the video so it never pushes controls off screen. */
 export function GraceBanner({ info }: { info: SubscriptionInfo }) {
+  const { tokens } = useOptionalTheme();
   const hasBilling = billingUrl() !== null;
+
   return (
-    <View
-      accessibilityRole="alert"
-      className="flex-row items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-100 px-3 py-2"
-    >
-      <Text className="flex-1 text-sm font-semibold text-amber-900" numberOfLines={2}>
-        {graceBannerText(info)}
-      </Text>
+    <View testID="grace-banner" style={{ gap: tokens.space.sm }}>
+      <Banner tone="warning" title={graceBannerText(info)} />
       {hasBilling ? (
-        <LiveButton
+        <Button
           label="Renew"
           variant="ghost"
+          size="sm"
           onPress={() => void openBilling()}
           accessibilityLabel="Renew subscription"
         />

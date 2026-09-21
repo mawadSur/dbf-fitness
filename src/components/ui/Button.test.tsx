@@ -1,11 +1,13 @@
 import { fireEvent, screen } from '@testing-library/react-native';
 import { View } from 'react-native';
 
+import { contrastRatio, TEXT_CONTRAST_MIN } from '../../theme/contrast';
 import { Button, type ButtonVariant } from './Button';
 import { BUTTON_HEIGHT, type ButtonSize } from './layout';
 import {
   BOTH_THEMES,
   colorsFor,
+  flattenStyle,
   INCLUDING_HIDDEN,
   mockReducedMotion,
   pressableStyle,
@@ -13,7 +15,7 @@ import {
   renderInTheme,
 } from './testing';
 
-const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'ghost', 'danger'];
+const VARIANTS: ButtonVariant[] = ['primary', 'secondary', 'ghost', 'danger', 'danger-outline'];
 const SIZES: ButtonSize[] = ['sm', 'md', 'lg'];
 
 describe('Button', () => {
@@ -44,8 +46,78 @@ describe('Button', () => {
     fireEvent.press(button);
     expect(onPress).not.toHaveBeenCalled();
     expect(button.props.accessibilityState.disabled).toBe(true);
-    // Colour is never the only signal: the state is announced AND dimmed.
-    expect(pressableStyle(button).opacity).toBe(0.45);
+  });
+
+  /**
+   * The regression this replaced a blanket `opacity: 0.45` for.
+   *
+   * Fading the whole pressable faded the fill AND the label towards the page
+   * by the same alpha, so in DARK mode the bright `cta` (#34D399) and the
+   * near-black `onCta` (#022C22) both collapsed toward #011A14 and met: the
+   * disabled label measured (14,80,59) on (24,108,79) = 1.48:1 on the Android
+   * emulator. Light mode kept a white label and stayed readable, which is why
+   * the whole defect was dark-only — so both themes are asserted here.
+   */
+  describe('disabled is legible, not just faded', () => {
+    it.each(BOTH_THEMES)('never dims the whole button in %s', async (scheme) => {
+      await renderInTheme(<Button label="Upload recording" disabled testID="b" />, scheme);
+      const style = pressableStyle(screen.getByTestId('b'));
+      expect(style.opacity).toBeUndefined();
+    });
+
+    it.each(BOTH_THEMES)(
+      'holds the disabled label above 4.5:1 on its own fill in %s',
+      async (scheme) => {
+        await renderInTheme(<Button label="Upload recording" disabled testID="b" />, scheme);
+        const colors = colorsFor(scheme);
+        const style = pressableStyle(screen.getByTestId('b'));
+        // A filled variant keeps a fill — just the muted one, not a ghost of the CTA.
+        expect(style.backgroundColor).toBe(colors.bgSoft);
+        const label = screen.getByText('Upload recording');
+        expect(flattenStyle(label.props.style).color).toBe(colors.textMuted);
+        expect(contrastRatio(colors.textMuted, colors.bgSoft)).toBeGreaterThanOrEqual(
+          TEXT_CONTRAST_MIN,
+        );
+      },
+    );
+
+    it.each(BOTH_THEMES)('keeps an outlined variant outlined in %s', async (scheme) => {
+      await renderInTheme(
+        <Button label="Cancel" variant="secondary" disabled testID="b" />,
+        scheme,
+      );
+      const style = pressableStyle(screen.getByTestId('b'));
+      expect(style.backgroundColor).toBe('transparent');
+      expect(style.borderWidth).toBe(2);
+      expect(style.borderColor).toBe(colorsFor(scheme).borderSoft);
+    });
+
+    it('keeps its own colours while LOADING, so the spinner stays visible', async () => {
+      await renderInTheme(<Button label="Saving" loading testID="b" />, 'dark');
+      const colors = colorsFor('dark');
+      expect(pressableStyle(screen.getByTestId('b')).backgroundColor).toBe(colors.cta);
+      expect(screen.getByTestId('button-spinner').props.color).toBe(colors.onCta);
+    });
+  });
+
+  /**
+   * "Delete account" used to be a plain `secondary` sitting directly under
+   * "Sign out" and "Change coach" in the danger zone, so the only thing
+   * separating an irreversible action from a benign one was a trash glyph.
+   */
+  it.each(BOTH_THEMES)('gives danger-outline the danger tone in %s', async (scheme) => {
+    await renderInTheme(
+      <Button label="Delete account" variant="danger-outline" testID="b" />,
+      scheme,
+    );
+    const colors = colorsFor(scheme);
+    const style = pressableStyle(screen.getByTestId('b'));
+    expect(style.backgroundColor).toBe('transparent');
+    expect(style.borderColor).toBe(colors.danger);
+    expect(style.borderWidth).toBe(2);
+    expect(flattenStyle(screen.getByText('Delete account').props.style).color).toBe(colors.danger);
+    // It is a real outline AND readable text, in both themes.
+    expect(contrastRatio(colors.danger, colors.bg)).toBeGreaterThanOrEqual(TEXT_CONTRAST_MIN);
   });
 
   it('does not fire while loading, shows a spinner and reports busy', async () => {
@@ -82,6 +154,7 @@ describe('Button', () => {
       secondary: 'transparent',
       ghost: 'transparent',
       danger: colors.danger,
+      'danger-outline': 'transparent',
     }[variant];
     expect(style.backgroundColor).toBe(expected);
   });

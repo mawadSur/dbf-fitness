@@ -8,7 +8,7 @@ import { BUTTON_HEIGHT, hitSlopFor, type ButtonSize } from './layout';
 import { PressableBase } from './PressableBase';
 import { Text } from './Typography';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-outline';
 
 export type ButtonProps = {
   label: string;
@@ -43,10 +43,49 @@ function skinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
     case 'danger':
       // The status *background* token is the readable foreground on the status fill.
       return { background: colors.danger, content: colors.dangerBg, border: null, ripple: colors.dangerBg };
+    case 'danger-outline':
+      // `secondary`, but in the danger tone: for an irreversible action that is
+      // only the ENTRY to a confirmation, so it must read as destructive at a
+      // glance without shouting as loud as the armed `danger` button it opens.
+      return {
+        background: 'transparent',
+        content: colors.danger,
+        border: colors.danger,
+        ripple: colors.dangerBg,
+      };
     case 'primary':
     default:
       return { background: colors.cta, content: colors.onCta, border: null, ripple: colors.brand };
   }
+}
+
+/**
+ * What a DISABLED button looks like — explicit tokens, never a blanket opacity.
+ *
+ * A single `opacity: 0.45` on the pressable fades the fill AND the label
+ * towards the page by the same alpha, so in dark mode the bright `cta`
+ * (#34D399) and the near-black `onCta` (#022C22) both collapsed toward
+ * #011A14 and met in the middle: the disabled "Sign in" / "Create account" /
+ * "Upload recording" label measured (14,80,59) on (24,108,79) = 1.48:1 on the
+ * Android emulator — invisible, and it is the FIRST thing a new user sees. In
+ * light mode the white label stayed readable, which is why this was dark-only.
+ *
+ * So a disabled button keeps its SHAPE (a filled variant stays filled, an
+ * outlined one stays outlined, a ghost stays flat) and swaps its colours for
+ * the muted pair: `textMuted` is verified >= 4.5:1 on every surface in BOTH
+ * themes by `src/theme/contrast.test.ts`, including `bgSoft`.
+ *
+ * Colour is still never the only signal: `accessibilityState.disabled` is set
+ * and the press is dropped.
+ */
+function disabledSkinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
+  const enabled = skinFor(variant, colors);
+  return {
+    background: enabled.background === 'transparent' ? 'transparent' : colors.bgSoft,
+    content: colors.textMuted,
+    border: enabled.border ? colors.borderSoft : null,
+    ripple: colors.bgSoft,
+  };
 }
 
 const ICON_SIZE = { sm: 16, md: 20, lg: 20 } as const;
@@ -69,9 +108,12 @@ export function Button({
   testID,
 }: ButtonProps) {
   const { colors, tokens } = useOptionalTheme();
-  const skin = skinFor(variant, colors);
   const height = BUTTON_HEIGHT[size];
   const inert = disabled || loading;
+  // A LOADING button keeps its own colours: the spinner is drawn in the
+  // variant's content colour and has to stay visible on the variant's fill.
+  // Only a genuinely disabled button takes the muted skin.
+  const skin = disabled && !loading ? disabledSkinFor(variant, colors) : skinFor(variant, colors);
 
   return (
     <PressableBase
@@ -100,8 +142,6 @@ export function Button({
           justifyContent: 'center',
           gap: 8,
           alignSelf: fullWidth ? 'stretch' : 'flex-start',
-          // Disabled stays at .45 opacity AND is announced: colour is never the only signal.
-          opacity: inert ? 0.45 : 1,
         },
         style,
       ]}

@@ -1,14 +1,21 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useReducer, type ReactElement } from 'react';
-import { FlatList, RefreshControl, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FlatList, RefreshControl, View } from 'react-native';
 
-import { BackButton } from '../../src/components/coaching/BackButton';
 import { CoachCard } from '../../src/components/coaching/CoachCard';
 import { ConfirmPanel } from '../../src/components/coaching/ConfirmPanel';
 import { confirmFlowReducer, initialConfirmFlow } from '../../src/components/coaching/confirmFlow';
-import { ErrorBlock, LoadingBlock, PrimaryButton } from '../../src/components/coaching/StateBlock';
+import { ErrorBlock, LoadingBlock } from '../../src/components/coaching/StateBlock';
 import { isStaffRole, useAccount } from '../../src/components/coaching/useAccount';
+import { ListSkeleton } from '../../src/components/ui/LoadingSkeleton';
+import {
+  Banner,
+  Button,
+  EmptyState,
+  FixedFooter,
+  ScreenHeader,
+  ScreenShell,
+} from '../../src/components/ui';
 import { ChooseCoachError } from '../../src/features/coaching/api';
 import { useChooseCoach, useCoaches, useMyCoach } from '../../src/features/coaching/hooks';
 import type { Coach, ChooseCoachErrorCode } from '../../src/features/coaching/types';
@@ -17,7 +24,6 @@ const SUCCESS_DELAY_MS = 1500;
 
 export default function PickCoachScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const account = useAccount();
 
   const goBack = useCallback(() => {
@@ -25,51 +31,43 @@ export default function PickCoachScreen() {
     else router.replace('/(tabs)/profile');
   }, [router]);
 
-  const header = (
-    <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 8, gap: 8 }}>
-      <View style={{ alignItems: 'flex-start' }}>
-        <BackButton onPress={goBack} />
-      </View>
-      <Text accessibilityRole="header" style={{ fontSize: 26, fontWeight: '800', color: '#0F172A' }}>
-        Choose your coach
-      </Text>
-    </View>
-  );
+  const header = <ScreenHeader eyebrow="Coaching" title="Choose your coach" onBack={goBack} />;
 
   if (account.isLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
-        {header}
-        <LoadingBlock />
-      </View>
+      <ScreenShell header={header} testID="pick-coach">
+        <LoadingBlock label="Loading your account…" />
+      </ScreenShell>
     );
   }
 
+  if (account.isError) {
+    return (
+      <ScreenShell header={header} testID="pick-coach">
+        <ErrorBlock message="Could not load your account." onRetry={() => account.refetch()} />
+      </ScreenShell>
+    );
+  }
+
+  // Staff never get a coach, so the picker must not even ask the server for the list.
   if (account.data && isStaffRole(account.data.role)) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
-        {header}
-        <View style={{ padding: 16 }}>
-          <Text style={{ fontSize: 15, color: '#334155' }}>
-            Choosing a coach is for members only. Coaches and admins do not have a coach.
-          </Text>
-        </View>
-      </View>
+      <ScreenShell header={header} testID="pick-coach">
+        <EmptyState
+          icon="info"
+          title="Members only"
+          message="Choosing a coach is for members only. Coaches and admins do not have a coach."
+          actionLabel="Go back"
+          onAction={goBack}
+        />
+      </ScreenShell>
     );
   }
 
-  return <CoachList header={header} goBack={goBack} bottomInset={insets.bottom} />;
+  return <CoachList header={header} goBack={goBack} />;
 }
 
-function CoachList({
-  header,
-  goBack,
-  bottomInset,
-}: {
-  header: ReactElement;
-  goBack: () => void;
-  bottomInset: number;
-}) {
+function CoachList({ header, goBack }: { header: ReactElement; goBack: () => void }) {
   const coaches = useCoaches();
   const myCoach = useMyCoach();
   const choose = useChooseCoach();
@@ -77,8 +75,8 @@ function CoachList({
 
   useEffect(() => {
     if (flow.status !== 'done') return;
-    const t = setTimeout(goBack, SUCCESS_DELAY_MS);
-    return () => clearTimeout(t);
+    const timer = setTimeout(goBack, SUCCESS_DELAY_MS);
+    return () => clearTimeout(timer);
   }, [flow.status, goBack]);
 
   const submit = async (coachId: string) => {
@@ -94,14 +92,57 @@ function CoachList({
 
   const currentCoachId = myCoach.data?.coachId ?? null;
   const busy = flow.status === 'saving';
+  const list = coaches.data ?? [];
+  // Partial data: the list arrived but nobody on it can take a new member.
+  const noneAccepting = list.length > 0 && !list.some((c) => c.acceptingMembers);
+
+  const renderItem = useCallback(
+    ({ item }: { item: Coach }) => (
+      <CoachCard
+        coach={item}
+        currentCoachId={currentCoachId}
+        disabled={busy}
+        onSelect={(c) => dispatch({ type: 'select', coachId: c.coachId, coachName: c.fullName })}
+      />
+    ),
+    [busy, currentCoachId],
+  );
+
+  const footer =
+    flow.status === 'done' ? (
+      <FixedFooter testID="choose-coach-done">
+        <View style={{ gap: 12 }}>
+          <Banner tone="success" title={`${flow.coachName} is now your coach.`} />
+          <Button label="Done" onPress={goBack} fullWidth />
+        </View>
+      </FixedFooter>
+    ) : flow.status !== 'idle' ? (
+      <ConfirmPanel
+        coachName={flow.coachName}
+        hasCurrentCoach={!!currentCoachId}
+        saving={busy}
+        errorCode={flow.status === 'error' ? flow.code : undefined}
+        onConfirm={() => submit(flow.coachId)}
+        onCancel={() => dispatch({ type: 'cancel' })}
+      />
+    ) : null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+    <ScreenShell scroll={false} padded={false} header={header} footer={footer} testID="pick-coach">
       <FlatList
-        data={coaches.data ?? []}
-        keyExtractor={(c) => c.coachId}
-        ListHeaderComponent={header}
-        contentContainerStyle={{ paddingBottom: 24, gap: 12 }}
+        data={list}
+        keyExtractor={keyOf}
+        renderItem={renderItem}
+        contentContainerStyle={{ padding: 16, gap: 12 }}
+        ListHeaderComponent={
+          noneAccepting ? (
+            <Banner
+              tone="info"
+              title="No coach is taking new members right now"
+              message="Check back soon, or ask your gym who is opening up next."
+            />
+          ) : null
+        }
         refreshControl={
           <RefreshControl
             refreshing={coaches.isRefetching}
@@ -111,53 +152,24 @@ function CoachList({
             }}
           />
         }
-        renderItem={({ item }: { item: Coach }) => (
-          <View style={{ paddingHorizontal: 16 }}>
-            <CoachCard
-              coach={item}
-              currentCoachId={currentCoachId}
-              disabled={busy}
-              onSelect={(c) => dispatch({ type: 'select', coachId: c.coachId, coachName: c.fullName })}
-            />
-          </View>
-        )}
         ListEmptyComponent={
           coaches.isLoading ? (
-            <LoadingBlock label="Loading coaches…" />
+            <ListSkeleton label="Loading coaches" />
           ) : coaches.isError ? (
-            <View style={{ paddingHorizontal: 16 }}>
-              <ErrorBlock message="Could not load coaches." onRetry={() => coaches.refetch()} />
-            </View>
+            <ErrorBlock message="Could not load coaches." onRetry={() => coaches.refetch()} />
           ) : (
-            <View style={{ padding: 24, alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#334155' }}>No coaches available yet</Text>
-            </View>
+            <EmptyState
+              icon="community"
+              title="No coaches available yet"
+              message="Once a coach joins DBF you can pick them here."
+              actionLabel="Refresh"
+              onAction={() => coaches.refetch()}
+            />
           )
         }
       />
-
-      {flow.status === 'done' ? (
-        <View
-          accessibilityRole="alert"
-          style={{ backgroundColor: '#ECFDF5', padding: 16, paddingBottom: bottomInset + 16, gap: 10 }}
-        >
-          <Text style={{ fontSize: 16, fontWeight: '700', color: '#065F46' }}>
-            {`${flow.coachName} is now your coach.`}
-          </Text>
-          <PrimaryButton label="Done" onPress={goBack} />
-        </View>
-      ) : flow.status !== 'idle' ? (
-        <View style={{ paddingBottom: bottomInset, backgroundColor: '#F0FDF4' }}>
-          <ConfirmPanel
-            coachName={flow.coachName}
-            hasCurrentCoach={!!currentCoachId}
-            saving={busy}
-            errorCode={flow.status === 'error' ? flow.code : undefined}
-            onConfirm={() => submit(flow.coachId)}
-            onCancel={() => dispatch({ type: 'cancel' })}
-          />
-        </View>
-      ) : null}
-    </View>
+    </ScreenShell>
   );
 }
+
+const keyOf = (coach: Coach) => coach.coachId;

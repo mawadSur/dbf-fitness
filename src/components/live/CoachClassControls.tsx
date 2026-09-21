@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { fetchClassAttendees, updateLiveClassStatus, type LiveClass } from '../../features/liveClasses/api';
 import {
@@ -12,8 +12,10 @@ import {
   uploadRecordingHref,
   type CoachAction,
 } from '../../features/liveClasses/coachActions';
+import { useOptionalTheme } from '../../theme/ThemeProvider';
 import { friendlyErrorMessage } from '../friendlyError';
-import { LiveButton } from './LiveButton';
+import { Badge, Banner, Button, Card, SectionHeader, Skeleton, Text } from '../ui';
+import { useDelayedVisible } from '../ui/useDelayedVisible';
 
 const ATTENDEE_REFETCH_MS = 15_000;
 
@@ -21,6 +23,7 @@ const ATTENDEE_REFETCH_MS = 15_000;
 export function CoachClassControls({ liveClass }: { liveClass: LiveClass }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { tokens } = useOptionalTheme();
   const [pending, setPending] = useState<CoachAction | null>(null);
   const actions = coachActionsFor(liveClass.status);
 
@@ -29,6 +32,7 @@ export function CoachClassControls({ liveClass }: { liveClass: LiveClass }) {
     queryFn: () => fetchClassAttendees(liveClass.id),
     refetchInterval: liveClass.status === 'live' ? ATTENDEE_REFETCH_MS : false,
   });
+  const showSkeleton = useDelayedVisible(attendees.isLoading);
 
   const mutation = useMutation({
     mutationFn: (action: CoachAction) => updateLiveClassStatus(liveClass.id, ACTION_TARGET_STATUS[action]),
@@ -38,17 +42,20 @@ export function CoachClassControls({ liveClass }: { liveClass: LiveClass }) {
     },
   });
 
+  const rows = attendees.data ?? [];
+
   return (
-    <View className="gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-      <Text className="text-base font-bold text-slate-900">Coach controls</Text>
+    <Card testID="coach-controls" tone="soft" padding={16} style={{ gap: tokens.space.md }}>
+      <SectionHeader title="Coach controls" style={{ marginBottom: 0 }} />
 
       {actions.length > 0 && pending === null ? (
-        <View className="flex-row flex-wrap gap-2">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space.sm }}>
           {actions.map((action) => (
-            <LiveButton
+            <Button
               key={action}
               label={ACTION_LABEL[action]}
-              variant={action === 'cancel' ? 'secondary' : 'primary'}
+              variant={action === 'start' ? 'primary' : 'secondary'}
+              leadingIcon={action === 'start' ? 'play' : action === 'end' ? 'pause' : 'x'}
               onPress={() => {
                 mutation.reset();
                 setPending(action);
@@ -59,59 +66,73 @@ export function CoachClassControls({ liveClass }: { liveClass: LiveClass }) {
       ) : null}
 
       {pending !== null ? (
-        <View accessibilityRole="alert" className="gap-2 rounded-lg border border-slate-300 bg-white p-3">
-          <Text className="text-sm text-slate-900">{ACTION_CONFIRM_TEXT[pending]}</Text>
-          <View className="flex-row flex-wrap gap-2">
-            <LiveButton
+        <Card tone="raised" padding={16} style={{ gap: tokens.space.md }}>
+          <Text role="bodySm" accessibilityRole="text">
+            {ACTION_CONFIRM_TEXT[pending]}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: tokens.space.sm }}>
+            <Button
               label={`Yes, ${ACTION_LABEL[pending].toLowerCase()}`}
               variant={pending === 'start' ? 'primary' : 'danger'}
-              busy={mutation.isPending}
+              loading={mutation.isPending}
               onPress={() => mutation.mutate(pending)}
             />
-            <LiveButton
+            <Button
               label="Keep as is"
-              variant="secondary"
+              variant="ghost"
               disabled={mutation.isPending}
               onPress={() => setPending(null)}
             />
           </View>
-        </View>
+        </Card>
       ) : null}
 
       {mutation.isError ? (
-        <Text className="text-sm text-red-700">
-          {friendlyErrorMessage(mutation.error, 'Could not update the class.')}
-        </Text>
+        <Banner
+          tone="danger"
+          title="Class not updated"
+          message={friendlyErrorMessage(mutation.error, 'Could not update the class.')}
+        />
       ) : null}
 
       {liveClass.status === 'ended' ? (
-        <LiveButton
+        <Button
           label="Upload recording"
+          leadingIcon="upload"
           onPress={() => router.push(uploadRecordingHref(liveClass.id))}
         />
       ) : null}
 
-      <View className="gap-1">
-        <Text className="text-sm font-semibold text-slate-900">
-          Attendees{attendees.data ? ` (${attendees.data.length})` : ''}
-        </Text>
+      <View style={{ gap: tokens.space.sm }}>
+        <Text role="labelSm">Attendees{attendees.data ? ` (${rows.length})` : ''}</Text>
         {attendees.isLoading ? (
-          <Text className="text-sm text-slate-500">Loading attendees…</Text>
+          showSkeleton ? (
+            <Skeleton testID="attendees-skeleton" width="70%" height={16} />
+          ) : null
         ) : attendees.isError ? (
-          <Text className="text-sm text-red-700">Could not load attendees.</Text>
-        ) : (attendees.data ?? []).length === 0 ? (
-          <Text className="text-sm text-slate-500">No one has joined yet.</Text>
+          <Banner tone="danger" title="Could not load attendees." />
+        ) : rows.length === 0 ? (
+          <Text role="bodySm" tone="muted">
+            No one has joined yet.
+          </Text>
         ) : (
-          (attendees.data ?? []).map((attendee) => (
-            <View key={attendee.memberId} className="flex-row items-center justify-between gap-2">
-              <Text className="flex-1 text-sm text-slate-700" numberOfLines={1}>
+          rows.map((attendee) => (
+            <View
+              key={attendee.memberId}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.space.sm }}
+            >
+              <Text role="bodySm" numberOfLines={1} style={{ flex: 1 }}>
                 {attendee.fullName}
               </Text>
-              <Text className="text-xs text-slate-500">{attendee.leftAt ? 'Left' : 'In class'}</Text>
+              <Badge
+                label={attendee.leftAt ? 'Left' : 'In class'}
+                tone={attendee.leftAt ? 'neutral' : 'success'}
+                icon={attendee.leftAt ? 'log-out' : 'check-circle'}
+              />
             </View>
           ))
         )}
       </View>
-    </View>
+    </Card>
   );
 }

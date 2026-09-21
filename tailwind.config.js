@@ -16,12 +16,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Still needed: the screens shipped before the design system use
-        // `emerald-600`/`emerald-700` directly, and Tailwind's default
-        // emerald-600 (#059669) is only 3.77:1 on white. Remapping it to
-        // #047857 (5.48:1) keeps those screens AA-compliant until they are
-        // migrated to the semantic tokens below.
-        emerald: { 600: '#047857', 700: '#065f46' },
+        // The `emerald: { 600, 700 }` remap is GONE. It existed because the
+        // pre-design-system screens used `emerald-600` directly and Tailwind's
+        // default (#059669) is only 3.77:1 on white. Stage 2 migrated the last
+        // of those screens onto the semantic tokens below, so nothing referred
+        // to it any more — and a raw hex here would now be the only one outside
+        // `src/theme/**`. Use `brand`/`primary` tokens, never a palette step.
 
         bg: { DEFAULT: token('bg'), soft: token('bg-soft') },
         surface: { DEFAULT: token('surface'), raised: token('surface-raised') },

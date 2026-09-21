@@ -14,6 +14,9 @@ export type JoinOptions = { graceAcknowledged?: boolean };
 
 export type SessionPhase = 'idle' | 'joining' | 'joined';
 
+/** Which video path the token function granted. Mirrors `RtcCredentials['mode']`. */
+export type RtcMode = 'live' | 'mock';
+
 type Member = { id: string; fullName: string };
 
 /** Refusals from agora-rtc-token that change what the screen offers (vs. a retryable failure). */
@@ -37,6 +40,9 @@ export function useLiveClassSession(classId: string, channelName: string | null,
   const [error, setError] = useState<string | null>(null);
   const [denial, setDenial] = useState<RtcErrorCode | null>(null);
   const [joinSubscription, setJoinSubscription] = useState<RtcSubscriptionInfo | null>(null);
+  // What the token function handed back: 'live' = real Agora video, 'mock' = the local preview
+  // adapter (no Agora credentials configured). The screen tells the member which one they are in.
+  const [mode, setMode] = useState<RtcMode | null>(null);
   // Set when the SERVER reports grace on a join the member has not yet acknowledged: the screen
   // must show the payment notice before the call is actually joined (even if its own
   // subscription query is null or failed).
@@ -97,6 +103,7 @@ export function useLiveClassSession(classId: string, channelName: string | null,
       const credentials = await fetchRtcCredentials(classId);
       if (unmountedRef.current) return;
       setJoinSubscription(credentials.subscription);
+      setMode(credentials.mode);
       if (credentials.subscription.state === 'grace' && !options?.graceAcknowledged) {
         // Late payer: hold the join until the member has seen the payment reminder.
         setGraceNotice(credentials.subscription);
@@ -173,6 +180,7 @@ export function useLiveClassSession(classId: string, channelName: string | null,
     tiles,
     error,
     denial,
+    mode,
     joinSubscription,
     graceNotice,
     join,

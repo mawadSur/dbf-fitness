@@ -37,13 +37,29 @@ export const STATUS_UI: Record<RecordingStatus, StatusUi> = {
   },
 };
 
-/** Chip colours. Text/background pairs all clear 4.5:1. */
-export const TONE_COLORS: Record<StatusTone, { background: string; text: string }> = {
-  neutral: { background: '#E2E8F0', text: '#0F172A' },
-  info: { background: '#DBEAFE', text: '#1E3A8A' },
-  success: { background: '#D1FAE5', text: '#064E3B' },
-  danger: { background: '#FEE2E2', text: '#7F1D1D' },
+/**
+ * The design-system `Badge` icon each tone wears.
+ *
+ * Status is never carried by colour alone (design system §9): the chip always shows an icon AND
+ * the word, so the pipeline reads the same in light, dark and greyscale. The tone names already
+ * match `BadgeTone`, so the chip needs no colour table of its own — the theme owns the palette.
+ */
+export const STATUS_ICONS: Record<StatusTone, 'clock' | 'file-text' | 'check-circle' | 'alert-triangle'> = {
+  info: 'clock',
+  neutral: 'file-text',
+  success: 'check-circle',
+  danger: 'alert-triangle',
 };
+
+/** Everything the status chip needs: the word, the themed tone and the icon beside it. */
+export function statusBadge(status: RecordingStatus): {
+  label: string;
+  tone: StatusTone;
+  icon: (typeof STATUS_ICONS)[StatusTone];
+} {
+  const ui = STATUS_UI[status];
+  return { label: ui.label, tone: ui.tone, icon: STATUS_ICONS[ui.tone] };
+}
 
 export function statusUi(status: RecordingStatus): StatusUi {
   return STATUS_UI[status];

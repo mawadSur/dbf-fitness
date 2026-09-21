@@ -1,14 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { fetchRoster } from '../../features/community/api';
 import type { Group } from '../../features/community/groups';
 import { mergeRosterWithPresence } from '../../features/community/roster';
 import { useGroupPresence } from '../../features/community/useGroupPresence';
+import { useOptionalTheme } from '../../theme/ThemeProvider';
 import { friendlyErrorMessage } from '../friendlyError';
+import { Banner, Button, EmptyState, SectionHeader, Skeleton } from '../ui';
 import type { Notice } from './NoticeBanner';
 import { PersonRow } from './PersonRow';
+import { useDelayedVisible } from '../ui/useDelayedVisible';
 
 type GroupRosterSectionProps = {
   group: Group;
@@ -16,12 +19,39 @@ type GroupRosterSectionProps = {
   onNotice: (notice: Notice) => void;
 };
 
+/** Two placeholder cards, so the list does not jump when the roster arrives. */
+function RosterSkeleton() {
+  const { colors, tokens } = useOptionalTheme();
+  return (
+    <View testID="roster-skeleton" style={{ gap: tokens.space.md }}>
+      {[0, 1].map((row) => (
+        <View
+          key={row}
+          style={{
+            gap: tokens.space.sm,
+            padding: tokens.space.lg,
+            borderRadius: tokens.radii.lg,
+            borderWidth: 1,
+            borderColor: colors.borderSoft,
+          }}
+        >
+          <Skeleton width="60%" height={20} />
+          <Skeleton width="30%" height={14} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** The roster of one group the member belongs to, with presence and the safety actions. */
 export function GroupRosterSection({ group, userId, onNotice }: GroupRosterSectionProps) {
+  const { tokens } = useOptionalTheme();
   const rosterQuery = useQuery({
     queryKey: ['community', 'roster', group.id],
     queryFn: () => fetchRoster(group.id),
   });
   const onlineIds = useGroupPresence(group.id, userId);
+  const showSkeleton = useDelayedVisible(rosterQuery.isLoading);
 
   const entries = useMemo(
     () => mergeRosterWithPresence(rosterQuery.data ?? [], onlineIds),
@@ -30,38 +60,42 @@ export function GroupRosterSection({ group, userId, onNotice }: GroupRosterSecti
   const onlineCount = entries.filter((entry) => entry.online).length;
 
   return (
-    <View className="gap-2">
-      <View className="flex-row items-baseline justify-between">
-        <Text accessibilityRole="header" className="min-w-0 flex-1 text-base font-semibold text-slate-900" numberOfLines={1}>
-          {group.name}
-        </Text>
-        {entries.length > 0 ? (
-          <Text className="shrink-0 pl-3 text-xs text-slate-600">
-            {onlineCount} of {entries.length} online
-          </Text>
-        ) : null}
-      </View>
+    <View style={{ gap: tokens.space.md }}>
+      <SectionHeader
+        title={group.name}
+        subtitle={entries.length > 0 ? `${onlineCount} of ${entries.length} online` : undefined}
+        style={{ marginBottom: 0 }}
+      />
 
       {rosterQuery.isLoading ? (
-        <ActivityIndicator color="#047857" accessibilityLabel={`Loading ${group.name}`} />
+        showSkeleton ? (
+          <RosterSkeleton />
+        ) : null
       ) : rosterQuery.isError ? (
-        <View className="items-start gap-2">
-          <Text accessibilityRole="alert" className="text-sm text-red-700">
-            {friendlyErrorMessage(rosterQuery.error, 'Could not load this group.')}
-          </Text>
-          <Pressable
+        <View style={{ gap: tokens.space.md }}>
+          <Banner
+            tone="danger"
+            title="Group did not load"
+            message={friendlyErrorMessage(rosterQuery.error, 'Could not load this group.')}
+          />
+          <Button
+            label="Try again"
+            variant="secondary"
             onPress={() => void rosterQuery.refetch()}
-            accessibilityRole="button"
-            android_ripple={{ color: 'rgba(4,120,87,0.15)' }}
-            className="min-h-[44px] min-w-[44px] justify-center active:opacity-80"
-          >
-            <Text className="text-sm font-semibold text-emerald-700">Try again</Text>
-          </Pressable>
+            accessibilityLabel={`Try loading ${group.name} again`}
+          />
         </View>
       ) : entries.length === 0 ? (
-        <Text className="text-sm text-slate-600">No one else is in this group yet.</Text>
+        <EmptyState
+          testID={`roster-empty-${group.id}`}
+          icon="community"
+          title="No one else here yet"
+          message="You are the first in this group. Invite a training partner, then check again."
+          actionLabel="Check again"
+          onAction={() => void rosterQuery.refetch()}
+        />
       ) : (
-        <View className="gap-2">
+        <View style={{ gap: tokens.space.md }}>
           {entries.map((entry) => (
             <PersonRow key={entry.memberId} entry={entry} onNotice={onNotice} />
           ))}

@@ -30,6 +30,7 @@ import {
   tabBarHeight,
   tabBarItemWidth,
   tabBarLabelFits,
+  tabBarLabelFitScale,
   tabBarLabelLineCount,
   tabBarLabelLineHeight,
   tabBarLabelLineWidth,
@@ -127,6 +128,44 @@ describe('tab bar geometry', () => {
     // 360pt phone: 68pt per tab, and 5.578em × 12.6pt = 70.3pt — it really
     // does need the second line there.
     expect(tabBarLabelLines(1.05, 360, 5, 'Community')).toBe(2);
+  });
+
+  /**
+   * The cap that stops a one-word tab label breaking BETWEEN LETTERS: at
+   * font_scale 2.0 the Android emulator drew "Community" as "Commu" over
+   * "nity" while the other four tabs stayed on one line.
+   */
+  describe('tabBarLabelFitScale', () => {
+    it('lets the label grow only as far as its own tab is wide', () => {
+      for (const width of PHONE_WIDTHS) {
+        const scale = tabBarLabelFitScale(width, 5, 'Community');
+        // One whole word on one line at the scale it hands back…
+        expect(tabBarLabelLines(scale, width, 5, 'Community')).toBe(1);
+        // …and one more notch would not fit.
+        expect(labelAdvanceWidth('Community', TAB_BAR_LABEL_FONT_SIZE, scale)).toBeLessThanOrEqual(
+          tabBarLabelLineWidth(width, 5),
+        );
+      }
+      // Wider phone, more room to grow.
+      expect(tabBarLabelFitScale(412, 5, 'Community')).toBeGreaterThan(
+        tabBarLabelFitScale(390, 5, 'Community'),
+      );
+    });
+
+    it('never shrinks below 100% and never grows past the label cap', () => {
+      // Too narrow for the label even at 12pt: the two-line box takes over
+      // rather than sub-12pt glyphs.
+      expect(tabBarLabelFitScale(200, 5, 'Community')).toBe(1);
+      expect(tabBarLabelFitScale(0, 5, 'Community')).toBe(1);
+      // A tablet column could hold far more, but the label still stops at 150%.
+      expect(tabBarLabelFitScale(1280, 5, 'Community')).toBe(TAB_BAR_LABEL_MAX_FONT_SCALE);
+      expect(tabBarLabelFitScale(390, 5, '')).toBe(TAB_BAR_LABEL_MAX_FONT_SCALE);
+    });
+
+    it('is driven by the label, so a short one is not held back by a long one', () => {
+      expect(tabBarLabelFitScale(390, 5, 'Food')).toBe(TAB_BAR_LABEL_MAX_FONT_SCALE);
+      expect(tabBarLabelFitScale(390, 5, 'Community')).toBeLessThan(TAB_BAR_LABEL_MAX_FONT_SCALE);
+    });
   });
 
   it('keeps one line at 100% and never reserves more than two', () => {

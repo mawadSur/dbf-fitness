@@ -1,57 +1,86 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 
 import { friendlyErrorMessage } from '../../../../src/components/friendlyError';
-import { LiveButton } from '../../../../src/components/live/LiveButton';
+import { useDelayedVisible } from '../../../../src/components/ui/useDelayedVisible';
 import { ScheduleClassForm } from '../../../../src/components/live/ScheduleClassForm';
+import {
+  Banner,
+  Button,
+  Card,
+  EmptyState,
+  ScreenHeader,
+  ScreenShell,
+  Skeleton,
+} from '../../../../src/components/ui';
 import { fetchCurrentMember } from '../../../../src/features/liveClasses/api';
 
 /** Coach/admin only: schedule a new live class. */
 export default function ScheduleClassScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const memberQuery = useQuery({ queryKey: ['liveClasses', 'me'], queryFn: fetchCurrentMember });
   const member = memberQuery.data ?? null;
+  const showSkeleton = useDelayedVisible(memberQuery.isLoading);
 
   const goBack = () => (router.canGoBack() ? router.back() : router.replace('/community/live'));
 
-  if (memberQuery.isLoading) {
+  const isCoach = member?.role === 'coach' || member?.role === 'admin';
+  if (memberQuery.isSuccess && isCoach && member) {
     return (
-      <View className="flex-1 bg-white px-4" style={{ paddingTop: insets.top + 8 }}>
-        <ActivityIndicator color="#059669" />
-      </View>
-    );
-  }
-
-  if (memberQuery.isError) {
-    return (
-      <View className="flex-1 gap-3 bg-white px-4" style={{ paddingTop: insets.top + 8 }}>
-        <LiveButton label="‹ Back" variant="ghost" onPress={goBack} className="self-start" accessibilityLabel="Back to live classes" />
-        <Text accessibilityRole="alert" className="text-sm text-red-700">
-          {friendlyErrorMessage(memberQuery.error, 'Could not load your profile.')}
-        </Text>
-        <LiveButton label="Try again" variant="secondary" onPress={() => void memberQuery.refetch()} />
-      </View>
-    );
-  }
-
-  if (!member || (member.role !== 'coach' && member.role !== 'admin')) {
-    return (
-      <View className="flex-1 gap-3 bg-white px-4" style={{ paddingTop: insets.top + 8 }}>
-        <LiveButton label="‹ Back" variant="ghost" onPress={goBack} className="self-start" accessibilityLabel="Back to live classes" />
-        <Text className="text-lg font-bold text-slate-900">Coaches only</Text>
-        <Text className="text-sm text-slate-600">Only coaches can schedule live classes.</Text>
-      </View>
+      <ScheduleClassForm
+        coachId={member.id}
+        onBack={goBack}
+        onCreated={(created) => router.replace(`/community/live/${created.id}`)}
+      />
     );
   }
 
   return (
-    <ScheduleClassForm
-      coachId={member.id}
-      onBack={goBack}
-      onCreated={(created) => router.replace(`/community/live/${created.id}`)}
-    />
+    <ScreenShell
+      testID="schedule-gate"
+      insideTabs
+      header={
+        <ScreenHeader
+          title="Schedule class"
+          eyebrow="Coach"
+          onBack={goBack}
+          backAccessibilityLabel="Back to live classes"
+        />
+      }
+    >
+      {memberQuery.isLoading ? (
+        showSkeleton ? (
+          <Card testID="schedule-gate-skeleton" style={{ gap: 12 }}>
+            <Skeleton width="60%" height={24} />
+            <Skeleton width="80%" height={16} />
+            <Skeleton height={48} radius={12} />
+          </Card>
+        ) : null
+      ) : memberQuery.isError ? (
+        <View style={{ gap: 12 }}>
+          <Banner
+            tone="danger"
+            title={friendlyErrorMessage(memberQuery.error, 'Could not load your profile.')}
+            testID="schedule-gate-error"
+          />
+          <Button
+            label="Try again"
+            variant="secondary"
+            leadingIcon="refresh"
+            onPress={() => void memberQuery.refetch()}
+          />
+        </View>
+      ) : (
+        <EmptyState
+          testID="schedule-gate-denied"
+          icon="lock"
+          title="Coaches only"
+          message="Only coaches can schedule live classes. Ask your coach to add one."
+          actionLabel="Back to live classes"
+          onAction={goBack}
+        />
+      )}
+    </ScreenShell>
   );
 }

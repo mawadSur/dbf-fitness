@@ -1,11 +1,5 @@
 import { useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Keyboard,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Keyboard, type TextInput, View } from 'react-native';
 
 import {
   ADMIN_MANAGED_NOTE,
@@ -19,17 +13,9 @@ import {
   type AccountRole,
 } from '../../features/account/deleteAccount';
 import type { DeleteAccountErrorCode } from '../../features/account/api';
-import { PressableBase } from '../ui/PressableBase';
-
-// #B91C1C is 6.4:1 on white and 5.9:1 on the #FEF2F2 panel; #FFFFFF on #B91C1C is 6.4:1. The
-// disabled fill #FCA5A5 is never used behind text that has to be read as a label (the label sits
-// on it at #7F1D1D, 5.1:1).
-const DANGER = '#B91C1C';
-const DANGER_DISABLED = '#FCA5A5';
-const DANGER_DISABLED_TEXT = '#7F1D1D';
-const PANEL_BG = '#FEF2F2';
-const PANEL_BORDER = '#FECACA';
-const PLACEHOLDER = '#64748B';
+import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { Banner, Button, Card, Heading, Icon, Text } from '../ui';
+import { PanelInput } from './PanelInput';
 
 export type DeleteAccountPanelProps = {
   role: AccountRole;
@@ -49,11 +35,17 @@ export type DeleteAccountPanelProps = {
   onFieldFocus?: () => void;
 };
 
-function Bullet({ children }: { children: string }) {
+/** One consequence of deleting, marked with the danger icon rather than a bare bullet glyph. */
+function Consequence({ children }: { children: string }) {
+  const { colors } = useOptionalTheme();
   return (
-    <View style={{ flexDirection: 'row', gap: 8 }}>
-      <Text style={{ color: DANGER, fontSize: 14, lineHeight: 20 }}>•</Text>
-      <Text style={{ flex: 1, color: '#334155', fontSize: 14, lineHeight: 20 }}>{children}</Text>
+    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+      <View style={{ paddingTop: 2 }}>
+        <Icon name="minus" size={16} color={colors.danger} />
+      </View>
+      <Text role="bodySm" tone="secondary" style={{ flex: 1 }}>
+        {children}
+      </Text>
     </View>
   );
 }
@@ -106,7 +98,7 @@ export function DeleteAccountPanel({ role, memberCount, onDelete, onDeleted, onO
 
   if (role === 'admin') {
     return (
-      <Text accessibilityRole="text" style={{ fontSize: 14, color: '#334155', lineHeight: 20 }}>
+      <Text role="bodySm" tone="secondary">
         {ADMIN_MANAGED_NOTE}
       </Text>
     );
@@ -115,42 +107,33 @@ export function DeleteAccountPanel({ role, memberCount, onDelete, onDeleted, onO
   if (done) {
     return (
       <View style={{ gap: 8 }}>
-        <Text accessibilityRole="alert" style={{ fontSize: 16, fontWeight: '700', color: '#047857' }}>
-          {DELETED_MESSAGE}
-        </Text>
-        <Text style={{ fontSize: 14, color: '#334155' }}>Taking you back to sign in…</Text>
+        <Banner tone="success" title={DELETED_MESSAGE} message="Taking you back to sign in…" />
       </View>
     );
   }
 
   if (!open) {
     return (
-      <View style={{ gap: 8 }}>
-        <Text style={{ fontSize: 14, color: '#334155' }}>
-          Permanently delete your account and personal data. This cannot be undone.
+      <View style={{ gap: 12 }}>
+        {/* The section subtitle above already warns that deletion is permanent, so this line says
+            WHAT goes instead of repeating "cannot be undone" two lines apart. */}
+        <Text role="bodySm" tone="secondary">
+          Your profile, workouts, notes and messages are removed with it.
         </Text>
-        <PressableBase
+        {/* `danger-outline`, not `secondary`: in the danger zone this button sat
+            directly under "Sign out" and "Change coach" with the SAME neutral
+            outline and the same text colour, so the only thing separating an
+            irreversible delete from a benign sign-out was a trash glyph. */}
+        <Button
+          label="Delete account"
+          variant="danger-outline"
+          leadingIcon="trash"
           onPress={() => {
             setOpen(true);
             onOpen?.();
           }}
-          accessibilityRole="button"
-          accessibilityLabel="Delete account"
-          android_ripple={{ color: PANEL_BORDER }}
-          pressFeedback={0.7}
-          // Layout NEVER goes in a style callback — see `PressableBase`.
-          style={{
-            minHeight: 44,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: DANGER,
-            paddingHorizontal: 16,
-          }}
-        >
-          <Text style={{ fontWeight: '600', color: DANGER }}>Delete account</Text>
-        </PressableBase>
+          fullWidth
+        />
       </View>
     );
   }
@@ -159,160 +142,74 @@ export function DeleteAccountPanel({ role, memberCount, onDelete, onDeleted, onO
   const showForm = !errorCode || isRetryable(errorCode);
 
   return (
-    <>
-      <View
-        style={{
-          gap: 12,
-          padding: 16,
-          borderRadius: 12,
-          backgroundColor: PANEL_BG,
-          borderWidth: 1,
-          borderColor: PANEL_BORDER,
-        }}
-      >
-        <Text accessibilityRole="header" style={{ fontSize: 17, fontWeight: '700', color: '#0F172A' }}>
-          Delete your account?
-        </Text>
+    <Card padding={16} tone="soft" testID="delete-account-panel">
+      <View style={{ gap: 12 }}>
+        <Heading level={3}>Delete your account?</Heading>
 
         <View style={{ gap: 6 }}>
           {deletionConsequences(role, memberCount).map((line) => (
-            <Bullet key={line}>{line}</Bullet>
+            <Consequence key={line}>{line}</Consequence>
           ))}
         </View>
 
-        <Text style={{ fontSize: 13, color: '#334155', lineHeight: 19 }}>{STORE_SUBSCRIPTION_NOTE}</Text>
+        <Text role="caption" tone="secondary">
+          {STORE_SUBSCRIPTION_NOTE}
+        </Text>
 
         {showForm ? (
           <>
-            <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155' }}>Your password</Text>
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                editable={!busy}
-                secureTextEntry
-                textContentType="password"
-                autoComplete="current-password"
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="next"
-                onFocus={onFieldFocus}
-                onSubmitEditing={() => confirmRef.current?.focus()}
-                placeholder="Current password"
-                placeholderTextColor={PLACEHOLDER}
-                accessibilityLabel="Your password"
-                style={{
-                  minHeight: 44,
-                  borderWidth: 1,
-                  borderColor: PANEL_BORDER,
-                  borderRadius: 10,
-                  backgroundColor: '#FFFFFF',
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  fontSize: 16,
-                  color: '#0F172A',
-                }}
-              />
-            </View>
-
-            <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: '#334155' }}>
-                {`Type ${CONFIRM_WORD} to confirm`}
-              </Text>
-              <TextInput
-                ref={confirmRef}
-                value={confirmText}
-                onChangeText={setConfirmText}
-                editable={!busy}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                autoComplete="off"
-                returnKeyType="done"
-                onFocus={onFieldFocus}
-                onSubmitEditing={submit}
-                placeholder={CONFIRM_WORD}
-                placeholderTextColor={PLACEHOLDER}
-                accessibilityLabel={`Type ${CONFIRM_WORD} to confirm`}
-                style={{
-                  minHeight: 44,
-                  borderWidth: 1,
-                  borderColor: PANEL_BORDER,
-                  borderRadius: 10,
-                  backgroundColor: '#FFFFFF',
-                  paddingHorizontal: 12,
-                  paddingVertical: 10,
-                  fontSize: 16,
-                  color: '#0F172A',
-                }}
-              />
-            </View>
+            <PanelInput
+              label="Your password"
+              value={password}
+              onChangeText={setPassword}
+              disabled={busy}
+              secureTextEntry
+              textContentType="password"
+              autoComplete="current-password"
+              autoCapitalize="none"
+              returnKeyType="next"
+              onFocus={onFieldFocus}
+              onSubmitEditing={() => confirmRef.current?.focus()}
+              placeholder="Current password"
+            />
+            <PanelInput
+              label={`Type ${CONFIRM_WORD} to confirm`}
+              value={confirmText}
+              onChangeText={setConfirmText}
+              inputRef={confirmRef}
+              disabled={busy}
+              autoCapitalize="characters"
+              autoComplete="off"
+              returnKeyType="done"
+              onFocus={onFieldFocus}
+              onSubmitEditing={submit}
+              placeholder={CONFIRM_WORD}
+            />
           </>
         ) : null}
 
-        {errorCode ? (
-          <Text accessibilityRole="alert" style={{ fontSize: 14, color: DANGER }}>
-            {deleteAccountErrorMessage(errorCode)}
-          </Text>
+        {errorCode ? <Banner tone="danger" title={deleteAccountErrorMessage(errorCode)} /> : null}
+
+        {/* Stacked, with the destructive action FIRST only once it is actually armed: at 200% text
+            a side-by-side pair clips, and "Permanently delete" is too long to share a row. */}
+        {showForm ? (
+          <Button
+            label="Permanently delete"
+            variant="danger"
+            onPress={submit}
+            disabled={!ready}
+            loading={busy}
+            fullWidth
+          />
         ) : null}
-
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <PressableBase
-            onPress={close}
-            disabled={busy}
-            accessibilityRole="button"
-            accessibilityLabel={showForm ? 'Cancel' : 'Close'}
-            accessibilityState={{ disabled: busy }}
-            android_ripple={{ color: '#E2E8F0' }}
-            pressFeedback={0.7}
-            // Layout NEVER goes in a style callback — see `PressableBase`.
-            style={{
-              flex: 1,
-              minHeight: 44,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: '#94A3B8',
-              backgroundColor: '#FFFFFF',
-            }}
-          >
-            <Text style={{ fontWeight: '600', color: '#334155' }}>{showForm ? 'Cancel' : 'Close'}</Text>
-          </PressableBase>
-
-          {showForm ? (
-            <PressableBase
-              onPress={submit}
-              disabled={!ready}
-              accessibilityRole="button"
-              accessibilityLabel="Permanently delete"
-              accessibilityState={{ disabled: !ready, busy }}
-              android_ripple={{ color: '#FECACA' }}
-              pressFeedback={0.85}
-              // Layout NEVER goes in a style callback — see `PressableBase`.
-              style={{
-                flex: 1,
-                minHeight: 44,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 12,
-                paddingHorizontal: 12,
-                backgroundColor: ready ? DANGER : DANGER_DISABLED,
-              }}
-            >
-              {busy ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text
-                  numberOfLines={1}
-                  style={{ fontWeight: '700', color: ready ? '#FFFFFF' : DANGER_DISABLED_TEXT }}
-                >
-                  Permanently delete
-                </Text>
-              )}
-            </PressableBase>
-          ) : null}
-        </View>
+        <Button
+          label={showForm ? 'Cancel' : 'Close'}
+          variant="ghost"
+          onPress={close}
+          disabled={busy}
+          fullWidth
+        />
       </View>
-    </>
+    </Card>
   );
 }

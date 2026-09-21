@@ -25,6 +25,7 @@ export {
   type HeroPanelSize,
 } from './HeroPanel';
 export { Icon, type IconProps } from './Icon';
+export { HONORIFICS, initialsOf } from './initials';
 export {
   ICON_NAMES,
   ICON_PATHS,
@@ -73,6 +74,7 @@ export {
   tabBarHeight,
   tabBarItemWidth,
   tabBarLabelFits,
+  tabBarLabelFitScale,
   tabBarLabelLineCount,
   tabBarLabelLineHeight,
   tabBarLabelLineWidth,
@@ -85,6 +87,13 @@ export {
   type PressFeedback,
 } from './layout';
 export { ListRow, LIST_ROW_MIN_HEIGHT, type ListRowProps } from './ListRow';
+export {
+  ListSkeleton,
+  LoadingSkeleton,
+  SKELETON_REVEAL_MS,
+  useDelayedReveal,
+  type LoadingSkeletonProps,
+} from './LoadingSkeleton';
 export { Logo, LOGO_ASPECT_RATIO, LOGO_BADGE_RADIUS, type LogoProps } from './Logo';
 export {
   MilestoneBadge,
@@ -126,3 +135,4 @@ export {
   type TextTone,
   type TypeRole,
 } from './Typography';
+export { SKELETON_DELAY_MS, useDelayedVisible } from './useDelayedVisible';

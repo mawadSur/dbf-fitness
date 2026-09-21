@@ -48,12 +48,3 @@ export function mergeRosterWithPresence(
       return a.memberId.localeCompare(b.memberId);
     });
 }
-
-/** Up to two uppercase initials for the avatar; "?" when the name has no letters to show. */
-export function initialsOf(fullName: string): string {
-  const words = fullName.trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return '?';
-  const first = words[0][0];
-  const last = words.length > 1 ? words[words.length - 1][0] : '';
-  return `${first}${last}`.toUpperCase();
-}

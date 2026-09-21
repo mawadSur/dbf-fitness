@@ -10,6 +10,7 @@ import { ChooseCoachError } from '../../features/coaching/api';
 import * as coachingApi from '../../features/coaching/api';
 import * as subApi from '../../features/subscriptions/api';
 import { supabase } from '../../services/supabase/client';
+import { ThemeProvider } from '../../theme/ThemeProvider';
 
 const mockRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: jest.fn(() => true) };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter }));
@@ -48,9 +49,18 @@ const FULL = { coachId: 'c2', fullName: 'Full Coach', bio: null, specialties: []
 const member = { id: 'u1', email: 'jordan@example.com', fullName: 'Jordan', role: 'member' as const };
 const coach = { id: 'u2', email: 'dana@example.com', fullName: 'Dana', role: 'coach' as const };
 
+/** Every screen here lives under the app's ThemeProvider, and the Appearance control needs it. */
+function wrap(ui: ReactElement, client: QueryClient) {
+  return (
+    <QueryClientProvider client={client}>
+      <ThemeProvider>{ui}</ThemeProvider>
+    </QueryClientProvider>
+  );
+}
+
 async function renderWithQuery(ui: ReactElement, existing?: QueryClient) {
   const client = existing ?? new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(wrap(ui, client));
 }
 
 const sub = (state: string, extra = {}) => ({ state, currentPeriodEnd: '2026-10-01T00:00:00Z', daysOverdue: 0, graceDaysLeft: 0, ...extra }) as never;
@@ -102,7 +112,8 @@ describe('profile tab', () => {
     subs.fetchSubscriptionState.mockResolvedValue(sub(state, state === 'grace' ? { daysOverdue: 3, graceDaysLeft: 7 } : {}));
     await renderWithQuery(<ProfileScreen />);
     expect((await screen.findByTestId('subscription-chip')).props.children).toBeTruthy();
-    expect(screen.getAllByText(chip).length).toBeGreaterThan(0);
+    // The grace chip also spells out how many days are left, so match on the state itself.
+    expect(screen.getAllByText(new RegExp(chip)).length).toBeGreaterThan(0);
     if (cta) {
       const spy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
       await fireEvent.press(screen.getByLabelText(cta));
@@ -132,11 +143,7 @@ describe('profile tab', () => {
     try {
       const scrollSpy = jest.spyOn(ScrollView.prototype, 'scrollToEnd').mockImplementation(() => undefined);
       const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-      await render(
-        <QueryClientProvider client={client}>
-          <ProfileScreen />
-        </QueryClientProvider>,
-      );
+      await render(wrap(<ProfileScreen />, client));
       const hasHandledTaps = (node: unknown): boolean => {
         if (!node || typeof node !== 'object') return false;
         if (Array.isArray(node)) return node.some(hasHandledTaps);
@@ -167,6 +174,48 @@ describe('profile tab', () => {
     expect(supabase.auth.signOut).toHaveBeenCalled();
     expect(clearSpy).toHaveBeenCalled();
     expect(client.getQueryData(['coaching', 'stale-user-a'])).toBeUndefined();
+  });
+
+  it('shows a skeleton while the account loads, never a bare spinner', async () => {
+    let release: (() => void) | undefined;
+    (supabase.auth.getSession as jest.Mock).mockReturnValue(
+      new Promise((resolve) => {
+        release = () => resolve({ data: { session: { user: { id: 'u1', email: null } } } });
+      }),
+    );
+    await renderWithQuery(<ProfileScreen />);
+    expect(await screen.findByLabelText('Loading account')).toBeTruthy();
+    expect(screen.queryByTestId('identity-header')).toBeNull();
+    // Let the query settle before the test ends, so no promise is left pending.
+    await act(async () => {
+      release?.();
+    });
+  });
+
+  it('shows a retryable error when the account fails to load', async () => {
+    (supabase.auth.getSession as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+    await renderWithQuery(<ProfileScreen />);
+    expect(await screen.findByText('Could not load your account.')).toBeTruthy();
+    setAccount(member);
+    await fireEvent.press(screen.getAllByLabelText('Retry')[0]);
+    expect(await screen.findByTestId('identity-header')).toBeTruthy();
+  });
+
+  it('names the role next to the member, with an icon and a word', async () => {
+    await renderWithQuery(<ProfileScreen />);
+    expect(await screen.findByText('Member')).toBeTruthy();
+    setAccount(coach);
+  });
+
+  it('pull-to-refresh refetches the account and the member queries', async () => {
+    await renderWithQuery(<ProfileScreen />);
+    await screen.findByText('Jordan');
+    const scroll = screen.getByTestId('profile-scroll');
+    const before = (supabase.auth.getSession as jest.Mock).mock.calls.length;
+    await act(async () => {
+      scroll.props.refreshControl.props.onRefresh();
+    });
+    expect((supabase.auth.getSession as jest.Mock).mock.calls.length).toBeGreaterThan(before);
   });
 
   it('reports a sign-out failure and stays put', async () => {

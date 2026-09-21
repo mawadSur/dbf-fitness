@@ -1,52 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 
-import { supabase } from '../../../../src/services/supabase/client';
+import { ExercisePictogram } from '../../../../src/components/exercises';
 import { friendlyErrorMessage } from '../../../../src/components/friendlyError';
-import { colors } from '../../../../src/theme/tokens';
-
-type ExerciseDetail = {
-  name: string;
-  repsOrDuration: string;
-  detail: string | null;
-};
-
-async function fetchExercise(exerciseId: string): Promise<ExerciseDetail> {
-  const { data, error } = await supabase
-    .from('exercises')
-    .select('name, reps_or_duration, detail')
-    .eq('id', exerciseId)
-    .single();
-  if (error) throw error;
-
-  return {
-    name: data.name,
-    repsOrDuration: data.reps_or_duration,
-    detail: data.detail,
-  };
-}
-
-function BackLink({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel="Go back"
-      android_ripple={{ color: colors.primaryMuted }}
-      className="min-h-[44px] justify-center self-start pr-4"
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-    >
-      <Text className="text-base font-semibold text-emerald-700">{label}</Text>
-    </Pressable>
-  );
-}
+import { Card, Chip, Heading, ScreenHeader, ScreenShell, Skeleton, Text } from '../../../../src/components/ui';
+import { RetryState } from '../../../../src/components/workout/ListStates';
+import { fetchExercise } from '../../../../src/features/workouts/queries';
+import { repsOrDurationIcon } from '../../../../src/features/workouts/repsOrDuration';
+import { useDelayedVisible } from '../../../../src/components/ui/useDelayedVisible';
 
 export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['workout', 'exercise', id],
@@ -54,60 +20,94 @@ export default function ExerciseDetailScreen() {
     enabled: !!id,
   });
 
+  const showSkeleton = useDelayedVisible(isLoading);
+  const back = () => router.back();
+
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator color={colors.primary} />
-      </View>
+      <ScreenShell
+        insideTabs
+        testID="exercise"
+        header={<ScreenHeader title="Exercise" onBack={back} />}
+      >
+        <View
+          style={{ gap: 16 }}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel="Loading this exercise"
+        >
+          {showSkeleton ? (
+            <>
+              <Skeleton width="100%" height={180} radius={16} />
+              <Skeleton width="60%" height={28} />
+              <Skeleton width="35%" height={20} />
+              <Skeleton width="100%" height={72} />
+            </>
+          ) : (
+            <>
+              <View style={{ height: 180 }} />
+              <View style={{ height: 28 }} />
+              <View style={{ height: 20 }} />
+              <View style={{ height: 72 }} />
+            </>
+          )}
+        </View>
+      </ScreenShell>
     );
   }
 
   if (isError || !data) {
     return (
-      <View className="flex-1 bg-white px-6" style={{ paddingTop: insets.top + 8 }}>
-        <BackLink label="‹ Back" onPress={() => router.back()} />
-        <View className="flex-1 items-center justify-center gap-2">
-          <Text accessibilityRole="alert" className="text-center text-base text-red-700">
-            {friendlyErrorMessage(error, 'Could not load this exercise.')}
-          </Text>
-          <Pressable
-            onPress={() => refetch()}
-            accessibilityRole="button"
-            accessibilityLabel="Try again"
-            android_ripple={{ color: colors.primaryMuted }}
-            className="min-h-[44px] items-center justify-center px-4"
-            style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-          >
-            <Text className="text-base font-semibold text-emerald-700">Try again</Text>
-          </Pressable>
-        </View>
-      </View>
+      <ScreenShell
+        insideTabs
+        testID="exercise"
+        header={<ScreenHeader title="Exercise" onBack={back} />}
+      >
+        <RetryState
+          title={friendlyErrorMessage(error, 'Could not load this exercise.')}
+          message="Nothing was lost — this was only a problem loading it."
+          onRetry={() => refetch()}
+          testID="exercise-error"
+        />
+      </ScreenShell>
     );
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-white"
-      contentContainerClassName="gap-4 px-6 pb-10"
-      contentContainerStyle={{
-        paddingTop: insets.top + 8,
-        paddingBottom: insets.bottom + 24,
-      }}
+    <ScreenShell
+      insideTabs
+      testID="exercise"
+      header={<ScreenHeader title={data.name} eyebrow="Exercise" onBack={back} />}
     >
-      <BackLink label="‹ Back" onPress={() => router.back()} />
+      <View style={{ gap: 16, paddingBottom: 24 }}>
+        <ExercisePictogram
+          imageKey={data.imageKey}
+          name={data.name}
+          variant="hero"
+          testID="exercise-hero"
+        />
 
-      <View className="gap-1">
-        <Text accessibilityRole="header" className="text-2xl font-bold text-slate-900">
-          {data.name}
-        </Text>
-        <Text className="text-base text-slate-600">{data.repsOrDuration}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {/* The icon is read off the value: a clock for durations, the barbell for
+              rep counts. One chip renders both, so a fixed clock mislabelled half
+              the data ("12 reps" behind a clock glyph). */}
+          <Chip label={data.repsOrDuration} icon={repsOrDurationIcon(data.repsOrDuration)} />
+        </View>
+
+        <Card padding={16}>
+          <View style={{ gap: 8 }}>
+            <Heading level={3}>How to do it</Heading>
+            {data.detail ? (
+              <Text tone="secondary">{data.detail}</Text>
+            ) : (
+              <Text tone="muted">
+                Your coach hasn&apos;t added notes for this one. Follow the movement above and ask
+                them if anything feels off.
+              </Text>
+            )}
+          </View>
+        </Card>
       </View>
-
-      {data.detail ? (
-        <Text className="text-base text-slate-700">{data.detail}</Text>
-      ) : (
-        <Text className="text-base text-slate-600">No additional detail for this exercise.</Text>
-      )}
-    </ScrollView>
+    </ScreenShell>
   );
 }

@@ -1,24 +1,29 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import type { RecordingStatus } from '../../services/transcription/types';
-import { statusUi, TONE_COLORS } from '../../features/notes/status';
+import { statusBadge } from '../../features/notes/status';
+import { Badge } from '../ui';
 
+/**
+ * The pipeline status of one recording.
+ *
+ * Icon + word, never colour alone (design system §9), and the tone comes from the theme so the
+ * chip reads in dark mode too.
+ *
+ * The wrapper exists only to keep the "Status: Draft" accessible name the screens' tests and a
+ * screen reader both rely on — `Badge` names itself after its label and takes no override. An
+ * accessible parent flattens its subtree, so the pair is announced once.
+ */
 export function StatusChip({ status }: { status: RecordingStatus }) {
-  const ui = statusUi(status);
-  const palette = TONE_COLORS[ui.tone];
+  const badge = statusBadge(status);
   return (
     <View
       accessible
-      accessibilityLabel={`Status: ${ui.label}`}
-      style={{
-        alignSelf: 'flex-start',
-        borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        backgroundColor: palette.background,
-      }}
+      accessibilityRole="text"
+      accessibilityLabel={`Status: ${badge.label}`}
+      style={{ alignSelf: 'flex-start' }}
     >
-      <Text style={{ color: palette.text, fontSize: 12, fontWeight: '700' }}>{ui.label}</Text>
+      <Badge label={badge.label} tone={badge.tone} icon={badge.icon} testID={`status-chip-${status}`} />
     </View>
   );
 }

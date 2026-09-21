@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { videoSurface } from '../../theme/tokens';
 import { loadAgoraModule } from './agoraModule';
 import type { VideoParticipant } from './types';
 
@@ -40,6 +41,9 @@ export function VideoSurface({ participant, mirror, style }: Props) {
 const styles = StyleSheet.create({
   fill: { flex: 1, overflow: 'hidden' },
   mirror: { transform: [{ scaleX: -1 }] },
-  placeholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b' },
-  label: { color: '#cbd5e1', fontSize: 12, textAlign: 'center' },
+  // The placeholder stands in for a camera frame, so it uses the fixed video
+  // scrim like every other live-video box — not the legacy slate it shipped
+  // with, which was the last raw hex in a rendered component.
+  placeholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: videoSurface.tile },
+  label: { color: videoSurface.onScrimMuted, fontSize: 12, textAlign: 'center' },
 });

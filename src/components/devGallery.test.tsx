@@ -75,6 +75,10 @@ const COMPONENT_MARKERS: [component: string, text: string | RegExp][] = [
   ['Banner dismissible', 'Dismissible'],
   ['EmptyState', 'No notes yet'],
   ['FixedFooter', 'Primary action'],
+  ['ExercisePictogram thumb', 'Bodyweight squat'],
+  ['ExercisePictogram fallback', 'Sled push'],
+  ['PressableBase', 'Default feedback'],
+  ['PressableBase no feedback', 'No feedback'],
 ];
 
 describe('dev gallery route', () => {
@@ -114,6 +118,22 @@ describe('dev gallery route', () => {
     it('does not redirect while the bundle is a dev bundle', async () => {
       await renderGallery(scheme);
       expect(mockRedirect).not.toHaveBeenCalled();
+    });
+  });
+
+  describe.each(BOTH_THEMES)('pictograms in the %s theme', (scheme: ThemeName) => {
+    /*
+     * The gallery is the screenshot surface for the pictogram system, so it has
+     * to show BOTH variants and both resolver paths. "Sled push" is not a known
+     * drawing: it exercises the category/default fallback, which must look
+     * deliberate rather than like a missing asset.
+     */
+    it('draws both hero and thumb variants', async () => {
+      await renderGallery(scheme);
+      expect(screen.getAllByTestId('exercise-pictogram-thumb', INCLUDING_HIDDEN).length).toBe(4);
+      expect(
+        screen.getAllByTestId(/^exercise-pictogram(-hero)?$/, INCLUDING_HIDDEN).length,
+      ).toBeGreaterThanOrEqual(2);
     });
   });
 

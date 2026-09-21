@@ -1,220 +1,114 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useState } from 'react';
+import { FlatList, View } from 'react-native';
 
-import { supabase } from '../../../src/services/supabase/client';
 import { friendlyErrorMessage } from '../../../src/components/friendlyError';
-import { colors } from '../../../src/theme/tokens';
-
-type WorkoutDayRow = {
-  id: string;
-  day_number: number;
-  block_name: string;
-  duration_minutes: number | null;
-};
-
-type WorkoutOverview = {
-  days: WorkoutDayRow[];
-  completedDayIds: Set<string>;
-  todayDayId: string | null;
-};
-
-async function getMemberId(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.user.id ?? null;
-}
-
-async function fetchWorkoutOverview(): Promise<WorkoutOverview> {
-  const memberId = await getMemberId();
-  if (!memberId) {
-    return { days: [], completedDayIds: new Set(), todayDayId: null };
-  }
-
-  const { data: plan, error: planError } = await supabase
-    .from('workout_plans')
-    .select('id')
-    .eq('member_id', memberId)
-    .maybeSingle();
-  if (planError) throw planError;
-  if (!plan) {
-    return { days: [], completedDayIds: new Set(), todayDayId: null };
-  }
-
-  const { data: days, error: daysError } = await supabase
-    .from('workout_days')
-    .select('id, day_number, block_name, duration_minutes')
-    .eq('workout_plan_id', plan.id)
-    .order('day_number', { ascending: true });
-  if (daysError) throw daysError;
-
-  const dayRows: WorkoutDayRow[] = days ?? [];
-  const dayIds = dayRows.map((day) => day.id);
-  const completedDayIds = new Set<string>();
-
-  if (dayIds.length > 0) {
-    const { data: completions, error: completionsError } = await supabase
-      .from('workout_completions')
-      .select('workout_day_id')
-      .eq('member_id', memberId)
-      .eq('status', 'completed')
-      .in('workout_day_id', dayIds);
-    if (completionsError) throw completionsError;
-
-    for (const completion of (completions ?? []) as {
-      workout_day_id: string;
-    }[]) {
-      completedDayIds.add(completion.workout_day_id);
-    }
-  }
-
-  const todayDay = dayRows.find((day) => !completedDayIds.has(day.id));
-
-  return {
-    days: dayRows,
-    completedDayIds,
-    todayDayId: todayDay?.id ?? null,
-  };
-}
+import { DayCard } from '../../../src/components/workout/DayCard';
+import { CardListSkeleton, RetryState } from '../../../src/components/workout/ListStates';
+import { EmptyState, ScreenHeader, ScreenShell } from '../../../src/components/ui';
+import type { PlanDay } from '../../../src/features/workouts/planSummary';
+import { fetchPlanOverview, getMemberId } from '../../../src/features/workouts/queries';
+import { useDelayedVisible } from '../../../src/components/ui/useDelayedVisible';
 
 export default function WorkoutScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [isRefreshing, setIsRefreshing] = useState(false);
+
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['workout', 'days'],
-    queryFn: fetchWorkoutOverview,
+    queryFn: async () => fetchPlanOverview(await getMemberId()),
   });
 
-  const handleRefresh = async () => {
+  const showSkeleton = useDelayedVisible(isLoading);
+
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
       await refetch();
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [refetch]);
+
+  const openDay = useCallback((dayId: string) => router.push(`/workout/${dayId}`), [router]);
+
+  const renderItem = useCallback(
+    ({ item }: { item: PlanDay }) => (
+      <DayCard
+        day={item}
+        isCompleted={!!data?.completedDayIds.has(item.id)}
+        isToday={data?.todayDayId === item.id}
+        onPress={openDay}
+      />
+    ),
+    [data?.completedDayIds, data?.todayDayId, openDay],
+  );
+
+  const header = <ScreenHeader title="Workout" eyebrow="Your plan" />;
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator color={colors.primary} />
-      </View>
+      <ScreenShell insideTabs testID="workout" header={header}>
+        <CardListSkeleton count={4} visible={showSkeleton} testID="workout-skeleton" />
+      </ScreenShell>
     );
   }
 
-  const refreshControl = <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />;
-  const centeredContent = {
-    flexGrow: 1,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingTop: insets.top + 16,
-  };
-
   if (isError) {
     return (
-      <ScrollView
-        className="flex-1 bg-white"
-        contentContainerStyle={centeredContent}
-        refreshControl={refreshControl}
+      <ScreenShell
+        insideTabs
+        testID="workout"
+        header={header}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}
       >
-        <Text accessibilityRole="alert" className="text-center text-base text-red-700">
-          {friendlyErrorMessage(error, 'Could not load your workout plan.')}
-        </Text>
-        <Pressable
-          onPress={() => refetch()}
-          accessibilityRole="button"
-          accessibilityLabel="Try again"
-          android_ripple={{ color: colors.primaryMuted }}
-          className="min-h-[44px] items-center justify-center px-4"
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-        >
-          <Text className="text-base font-semibold text-emerald-700">Try again</Text>
-        </Pressable>
-      </ScrollView>
+        <RetryState
+          title={friendlyErrorMessage(error, 'Could not load your workout plan.')}
+          message="Your plan is safe — this was only a problem loading it."
+          onRetry={() => refetch()}
+          busy={isRefreshing}
+          testID="workout-error"
+        />
+      </ScreenShell>
     );
   }
 
   if (!data || data.days.length === 0) {
     return (
-      <ScrollView
-        className="flex-1 bg-white"
-        contentContainerStyle={centeredContent}
-        refreshControl={refreshControl}
+      <ScreenShell
+        insideTabs
+        testID="workout"
+        header={header}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}
       >
-        <Text accessibilityRole="header" className="text-2xl font-bold text-slate-900">
-          Workout
-        </Text>
-        <Text className="text-center text-base text-slate-600">
-          Your coach hasn&apos;t assigned a workout plan yet.
-        </Text>
-      </ScrollView>
+        <EmptyState
+          icon="clock"
+          title="Your coach is preparing your plan"
+          message="Your coach hasn't assigned a workout plan yet. Pull down to check again."
+          testID="workout-empty"
+        />
+      </ScreenShell>
     );
   }
 
   return (
-    <FlatList
-      testID="workout-list"
-      className="flex-1 bg-white"
-      data={data.days}
-      keyExtractor={(day) => day.id}
-      contentContainerClassName="gap-3 px-6 pb-10"
-      contentContainerStyle={{ paddingTop: insets.top + 16 }}
-      refreshControl={refreshControl}
-      ListHeaderComponent={
-        <Text accessibilityRole="header" className="pb-1 text-2xl font-bold text-slate-900">
-          Workout
-        </Text>
-      }
-      renderItem={({ item: day }) => {
-        const isCompleted = data.completedDayIds.has(day.id);
-        const isToday = data.todayDayId === day.id;
-        const statusLabel = isCompleted ? 'Completed' : 'Upcoming';
-
-        return (
-          <Pressable
-            onPress={() => router.push(`/workout/${day.id}`)}
-            accessibilityRole="button"
-            accessibilityLabel={`Day ${day.day_number}, ${day.block_name}, ${statusLabel}${isToday ? ', today' : ''}`}
-            android_ripple={{ color: colors.primaryMuted }}
-            className={`min-h-[44px] flex-row items-center justify-between gap-3 rounded-lg border p-4 ${
-              isToday ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 bg-slate-50'
-            }`}
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-          >
-            <View className="flex-1 gap-1">
-              <Text className="text-xs font-semibold uppercase text-slate-600">
-                Day {day.day_number}
-                {isToday ? ' · Today' : ''}
-              </Text>
-              <Text numberOfLines={2} className="text-lg font-bold text-slate-900">
-                {day.block_name}
-              </Text>
-              {day.duration_minutes != null ? (
-                <Text className="text-sm text-slate-600">{day.duration_minutes} min</Text>
-              ) : null}
-            </View>
-            <Text
-              className={`text-sm font-semibold ${
-                isCompleted ? 'text-emerald-700' : 'text-slate-600'
-              }`}
-            >
-              {statusLabel}
-            </Text>
-          </Pressable>
-        );
-      }}
-    />
+    <ScreenShell insideTabs scroll={false} testID="workout" header={header}>
+      <FlatList
+        testID="workout-list"
+        data={data.days}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ItemSeparatorComponent={Separator}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}
+      />
+    </ScreenShell>
   );
 }
+
+const keyExtractor = (day: PlanDay) => day.id;
+const Separator = () => <View style={{ height: 12 }} />;

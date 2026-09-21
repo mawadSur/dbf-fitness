@@ -1,6 +1,6 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
-import { NotesButton } from '../notes/NotesButton';
+import { Banner, Button, Card, Text } from '../ui';
 import { billingUrl, CONTACT_COACH_TO_RENEW, openBilling } from './billing';
 
 type Props = {
@@ -23,39 +23,37 @@ export const REQUIRED_COPY = {
   },
 } as const;
 
-/** Shown in place of workout notes when the member has no access. Never crashes without a billing URL. */
+/**
+ * Shown in place of workout notes when the member has no access.
+ *
+ * The reason is a `Banner` (alert role, icon + words, so it is announced and never signalled by
+ * colour alone) inside a card that carries the way out. Never crashes without a billing URL.
+ */
 export function SubscriptionRequiredPanel({ state, onRecheck, checking = false }: Props) {
   const copy = REQUIRED_COPY[state];
   const hasBilling = billingUrl() !== null;
 
   return (
-    <View
-      accessibilityRole="alert"
-      style={{
-        margin: 16,
-        gap: 8,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#FCD34D',
-        backgroundColor: '#FFFBEB',
-        padding: 16,
-      }}
-    >
-      <Text style={{ fontSize: 18, fontWeight: '700', color: '#78350F' }}>{copy.title}</Text>
-      <Text style={{ fontSize: 14, color: '#78350F' }}>{copy.body}</Text>
-      {hasBilling ? (
-        <NotesButton label={copy.cta} onPress={() => void openBilling()} />
-      ) : (
-        <Text style={{ fontSize: 14, fontWeight: '600', color: '#78350F' }}>{CONTACT_COACH_TO_RENEW}</Text>
-      )}
-      {onRecheck ? (
-        <NotesButton
-          label="I’ve renewed — check again"
-          variant="secondary"
-          onPress={onRecheck}
-          busy={checking}
-        />
-      ) : null}
-    </View>
+    <Card padding={16} testID="subscription-required">
+      <View style={{ gap: 12 }}>
+        <Banner tone="warning" title={copy.title} message={copy.body} icon="lock" />
+        {hasBilling ? (
+          <Button label={copy.cta} onPress={() => void openBilling()} fullWidth />
+        ) : (
+          <Text role="labelSm" tone="secondary">
+            {CONTACT_COACH_TO_RENEW}
+          </Text>
+        )}
+        {onRecheck ? (
+          <Button
+            label="I’ve renewed — check again"
+            variant="secondary"
+            onPress={onRecheck}
+            loading={checking}
+            fullWidth
+          />
+        ) : null}
+      </View>
+    </Card>
   );
 }

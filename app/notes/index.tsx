@@ -1,9 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Banner } from '../../src/components/ui';
 import { GraceBanner } from '../../src/components/subscription/GraceBanner';
 import { SubscriptionRequiredPanel } from '../../src/components/subscription/SubscriptionRequiredPanel';
 import { NotesButton } from '../../src/components/notes/NotesButton';
@@ -157,9 +158,7 @@ export default function NotesIndexScreen() {
                   onPress={() => router.push('/notes/upload')}
                 />
                 {retryError ? (
-                  <Text accessibilityRole="alert" style={{ fontSize: 13, color: '#B91C1C' }}>
-                    {retryError}
-                  </Text>
+                  <Banner tone="danger" title="Could not restart transcription" message={retryError} />
                 ) : null}
               </View>
             ) : null

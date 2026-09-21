@@ -1,12 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Text, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 
+import { Banner, SectionHeader, Text } from '../../src/components/ui';
 import { BottomActionBar } from '../../src/components/notes/BottomActionBar';
+import { ClassPickerRow } from '../../src/components/notes/ClassPickerRow';
 import { NotesButton } from '../../src/components/notes/NotesButton';
 import { NotesScreenShell } from '../../src/components/notes/NotesScreenShell';
-import { formatRecordingDate } from '../../src/components/notes/RecordingListItem';
 import { StateMessage } from '../../src/components/notes/StateMessage';
+import { formatSize, UploadProgress } from '../../src/components/notes/UploadProgress';
 import { retryTranscription } from '../../src/features/notes/api';
 import { useCoachClasses, useDeepLinkedClass, useNotesViewer } from '../../src/features/notes/hooks';
 import { pickRecordingFile } from '../../src/features/notes/pickRecordingFile';
@@ -19,14 +21,6 @@ import {
   type RecordingFile,
 } from '../../src/services/recordings';
 import { transcriptionErrorMessage } from '../../src/services/transcription/types';
-import { colors } from '../../src/theme/tokens';
-import { PressableBase } from '../../src/components/ui/PressableBase';
-
-function formatSize(bytes?: number): string {
-  if (typeof bytes !== 'number') return '';
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
 
 export default function UploadRecordingScreen() {
   const router = useRouter();
@@ -204,11 +198,13 @@ export default function UploadRecordingScreen() {
             contentContainerStyle={{ padding: 16, paddingBottom: 24, gap: 8 }}
             ListHeaderComponent={
               <View style={{ gap: 8, marginBottom: 4 }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>1. Choose the class</Text>
+                <SectionHeader eyebrow="Step 1" title="Choose the class" />
                 {deepLinkNotMine ? (
-                  <Text style={{ fontSize: 13, color: '#B91C1C' }}>
-                    That class is not one of yours. Pick one below.
-                  </Text>
+                  <Banner
+                    tone="warning"
+                    title="That class is not one of yours"
+                    message="Pick one of your own classes below."
+                  />
                 ) : null}
               </View>
             }
@@ -219,84 +215,43 @@ export default function UploadRecordingScreen() {
                 message="Schedule a live class first, then upload its recording."
               />
             }
-            renderItem={({ item }) => {
-              const selected = item.id === selectedId;
-              return (
-                <PressableBase
-                  onPress={() => setPickedId(item.id)}
-                  disabled={uploading}
-                  accessibilityRole="radio"
-                  accessibilityLabel={item.title}
-                  accessibilityState={{ selected, disabled: uploading }}
-                  android_ripple={{ color: '#D1FAE5' }}
-                  pressFeedback={0.75}
-                  // Layout NEVER goes in a style callback — see `PressableBase`.
-                  style={{
-                    minHeight: 56,
-                    borderWidth: 2,
-                    borderColor: selected ? colors.primary : '#E2E8F0',
-                    backgroundColor: selected ? '#F0FDF4' : '#F8FAFC',
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text numberOfLines={1} style={{ fontSize: 16, fontWeight: '600', color: '#0F172A' }}>
-                    {item.title}
-                  </Text>
-                  <Text style={{ fontSize: 13, color: '#475569' }}>{formatRecordingDate(item.starts_at)}</Text>
-                </PressableBase>
-              );
-            }}
+            renderItem={({ item }) => (
+              <ClassPickerRow
+                item={item}
+                selected={item.id === selectedId}
+                disabled={uploading}
+                onPress={() => setPickedId(item.id)}
+              />
+            )}
             ListFooterComponent={
               <View style={{ gap: 8, marginTop: 16 }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>2. Choose the recording</Text>
+                <SectionHeader eyebrow="Step 2" title="Choose the recording" />
                 <NotesButton
                   label={file ? 'Choose a different file' : 'Choose video or audio file'}
                   variant="secondary"
+                  leadingIcon="upload"
                   disabled={uploading}
                   onPress={() => void choose()}
                 />
                 {file ? (
-                  <Text numberOfLines={2} style={{ fontSize: 14, color: '#0F172A' }}>
+                  <Text role="body" numberOfLines={2}>
                     {file.name}
                     {file.size !== undefined ? `  (${formatSize(file.size)})` : ''}
                   </Text>
                 ) : (
-                  <Text style={{ fontSize: 12, color: '#475569' }}>
+                  <Text role="caption" tone="muted">
                     MP4, MOV, M4A, MP3 and similar. Up to 500 MB.
                   </Text>
                 )}
-                {fileError ? (
-                  <Text accessibilityRole="alert" style={{ fontSize: 14, color: '#B91C1C' }}>
-                    {fileError}
-                  </Text>
-                ) : null}
+                {fileError ? <Banner tone="danger" title="That file will not work" message={fileError} /> : null}
               </View>
             }
           />
 
           <BottomActionBar>
-            {uploading ? (
-              <View style={{ gap: 6 }} accessibilityLiveRegion="polite">
-                <View
-                  accessibilityRole="progressbar"
-                  accessibilityLabel={`Uploading, ${percent} percent`}
-                  accessibilityValue={{ min: 0, max: 100, now: percent }}
-                  style={{ height: 8, borderRadius: 4, backgroundColor: colors.primaryMuted, overflow: 'hidden' }}
-                >
-                  <View style={{ height: 8, width: `${percent}%`, backgroundColor: colors.primary }} />
-                </View>
-                <Text style={{ fontSize: 13, color: '#475569' }}>
-                  {`Uploading ${percent}%. Keep this screen open until it finishes; long videos can take a while.`}
-                </Text>
-              </View>
-            ) : null}
+            {uploading ? <UploadProgress percent={percent} /> : null}
             {uploadError ? (
-              <Text accessibilityRole="alert" style={{ fontSize: 14, color: '#B91C1C' }}>
-                {uploadError}
-              </Text>
+              <Banner tone="danger" title="The upload did not finish" message={uploadError} />
             ) : null}
             {failedRecordingId ? (
               // The file is already uploaded: offer the retry that finishes the job, never a

@@ -1,8 +1,7 @@
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PressableBase } from '../ui/PressableBase';
+
+import { ScreenHeader, ScreenShell } from '../ui';
 
 type NotesScreenShellProps = {
   title: string;
@@ -12,12 +11,18 @@ type NotesScreenShellProps = {
 };
 
 /**
- * Screens outside the tab shell draw their own header, so pad for the status bar / notch and keep
- * the Back control a 44pt target. Children own the remaining space (and the bottom inset).
+ * The frame for every screen under `/notes`.
+ *
+ * `ScreenShell` owns the status-bar inset and the centred 640 column; `ScreenHeader` draws the
+ * screen's one `h1` and the back chevron above the scroll area, so scrolled content can never run
+ * under the clock (design system §6).
+ *
+ * The body does not scroll and is not padded: each notes screen owns a `FlatList` (with its own
+ * gutter) and, where it has one, a `BottomActionBar`. `paddingBottom: 0` hands the gesture-bar
+ * inset to whichever of those actually touches the bottom edge, so it is never paid twice.
  */
 export function NotesScreenShell({ title, children, fallbackHref = '/(tabs)' }: NotesScreenShellProps) {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
 
   const goBack = () => {
     if (router.canGoBack()) router.back();
@@ -25,44 +30,14 @@ export function NotesScreenShell({ title, children, fallbackHref = '/(tabs)' }: 
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#FFFFFF', paddingTop: insets.top }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 8,
-          paddingLeft: Math.max(insets.left, 8),
-          paddingRight: Math.max(insets.right, 16),
-          paddingVertical: 4,
-        }}
-      >
-        <PressableBase
-          onPress={goBack}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          android_ripple={{ color: '#D1FAE5', borderless: true }}
-          hitSlop={8}
-          pressFeedback={0.6}
-          // Layout NEVER goes in a style callback — see `PressableBase`.
-          style={{
-            minWidth: 44,
-            minHeight: 44,
-            paddingHorizontal: 8,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ color: '#047857', fontSize: 16, fontWeight: '600' }}>‹ Back</Text>
-        </PressableBase>
-        <Text
-          numberOfLines={1}
-          accessibilityRole="header"
-          style={{ flex: 1, fontSize: 20, fontWeight: '700', color: '#0F172A' }}
-        >
-          {title}
-        </Text>
-      </View>
-      <View style={{ flex: 1 }}>{children}</View>
-    </View>
+    <ScreenShell
+      scroll={false}
+      padded={false}
+      contentStyle={{ paddingBottom: 0 }}
+      testID="notes-shell"
+      header={<ScreenHeader title={title} onBack={goBack} />}
+    >
+      {children}
+    </ScreenShell>
   );
 }

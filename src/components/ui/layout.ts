@@ -318,6 +318,32 @@ export function tabBarLabelLines(
 }
 
 /**
+ * The largest font scale at which `label` still fits ONE tab line.
+ *
+ * Two lines are not free: text wrapping is DISCRETE and a tab label is a
+ * single word, so the only place "Community" can break is BETWEEN LETTERS. At
+ * font_scale 2.0 the Android emulator rendered it as "Commu" / "nity" while
+ * the other four tabs stayed on one line, which reads as a rendering fault
+ * rather than as large text.
+ *
+ * So the label grows only as far as its own tab is wide. On the phones we
+ * ship on that is ~101% (360pt), ~110% (390pt) and ~116% (412pt) — modest, but
+ * it is the whole word on one line at every OS text size, and the full name is
+ * in the tab's `accessibilityLabel` for anyone who needs it read out.
+ *
+ * Never below 1 and never above `TAB_BAR_LABEL_MAX_FONT_SCALE`: a bar too
+ * narrow to hold the label at its BASE size still needs the two-line box, and
+ * shrinking a tab label below 12pt would be its own accessibility defect.
+ */
+export function tabBarLabelFitScale(barWidth: number, tabCount: number, label: string): number {
+  const advanceEm = textAdvanceEm(label);
+  if (advanceEm <= 0) return TAB_BAR_LABEL_MAX_FONT_SCALE;
+  const fits =
+    tabBarLabelLineWidth(barWidth, tabCount) / (advanceEm * TAB_BAR_LABEL_FONT_SIZE);
+  return Math.max(1, Math.min(TAB_BAR_LABEL_MAX_FONT_SCALE, fits));
+}
+
+/**
  * Does the longest tab label still fit its tab at this font scale?
  *
  * The label box is at most `TAB_BAR_MAX_LABEL_LINES` line boxes tall and

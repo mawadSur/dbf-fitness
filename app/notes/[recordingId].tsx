@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Text } from '../../src/components/ui';
 import { GraceBanner } from '../../src/components/subscription/GraceBanner';
 import { SubscriptionRequiredPanel } from '../../src/components/subscription/SubscriptionRequiredPanel';
 import { CoachRecordingView } from '../../src/components/notes/CoachRecordingView';
@@ -146,7 +147,7 @@ export default function RecordingDetailScreen() {
           }}
         />
         {progress.isLoading ? (
-          <Text style={{ fontSize: 12, color: '#475569', textAlign: 'center', paddingBottom: 8 }}>
+          <Text role="bodySm" tone="muted" style={{ textAlign: 'center', paddingBottom: 8 }}>
             Loading your progress…
           </Text>
         ) : null}

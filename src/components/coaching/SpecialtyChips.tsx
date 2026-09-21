@@ -1,17 +1,16 @@
 import { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { View } from 'react-native';
 
 import { SPECIALTY_MAX_LENGTH } from '../../features/coaching/validators';
-import { PressableBase } from '../ui/PressableBase';
+import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { Button, Chip, Icon, Input, PressableBase, Text } from '../ui';
 
 export function SpecialtyChipList({ items }: { items: string[] }) {
   if (items.length === 0) return null;
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
       {items.map((s) => (
-        <View key={s} style={{ backgroundColor: '#D1FAE5', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
-          <Text style={{ fontSize: 13, color: '#065F46' }}>{s}</Text>
-        </View>
+        <Chip key={s} label={s} />
       ))}
     </View>
   );
@@ -25,8 +24,14 @@ type InputProps = {
   returnKeyType?: 'next' | 'done';
 };
 
-/** Chip input: type a specialty and press return / Add; tap a chip to remove it. */
+/**
+ * Chip input: type a specialty and press return / Add; tap a chip to remove it.
+ *
+ * Each chip is a 44pt-tall button carrying an `x` icon, so removal is a target you can hit and a
+ * shape you can recognise rather than a bare glyph in the label.
+ */
 export function SpecialtyChipInput({ items, onChange, error, onSubmitEditing, returnKeyType = 'done' }: InputProps) {
+  const { colors, tokens } = useOptionalTheme();
   const [draft, setDraft] = useState('');
 
   const commit = () => {
@@ -39,81 +44,60 @@ export function SpecialtyChipInput({ items, onChange, error, onSubmitEditing, re
   };
 
   return (
-    <View style={{ gap: 8 }}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-        {items.map((s) => (
-          <PressableBase
-            key={s}
-            onPress={() => onChange(items.filter((i) => i !== s))}
-            accessibilityRole="button"
-            accessibilityLabel={`Remove ${s}`}
-            android_ripple={{ color: '#A7F3D0' }}
-            pressFeedback={0.7}
-            // Layout NEVER goes in a style callback — see `PressableBase`.
-            style={{
-              minHeight: 44,
-              justifyContent: 'center',
-              backgroundColor: '#D1FAE5',
-              borderRadius: 999,
-              paddingHorizontal: 12,
-            }}
-          >
-            <Text style={{ fontSize: 14, color: '#065F46' }}>{s}  ×</Text>
-          </PressableBase>
-        ))}
-      </View>
-      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          onSubmitEditing={() => {
-            commit();
-            onSubmitEditing?.();
-          }}
-          blurOnSubmit={false}
-          placeholder="Add a specialty"
-          placeholderTextColor="#64748B"
-          accessibilityLabel="Add a specialty"
-          returnKeyType={returnKeyType}
-          autoCapitalize="words"
-          autoCorrect={false}
-          maxLength={SPECIALTY_MAX_LENGTH * 2}
-          style={{
-            flex: 1,
-            minHeight: 44,
-            borderWidth: 1,
-            borderColor: error ? '#DC2626' : '#E2E8F0',
-            borderRadius: 10,
-            paddingHorizontal: 12,
-            color: '#0F172A',
-          }}
-        />
-        <PressableBase
-          onPress={commit}
-          accessibilityRole="button"
-          accessibilityLabel="Add specialty"
-          accessibilityState={{ disabled: draft.trim().length === 0 }}
-          disabled={draft.trim().length === 0}
-          android_ripple={{ color: '#A7F3D0' }}
-          pressFeedback={0.8}
-          // Layout NEVER goes in a style callback — see `PressableBase`.
-          style={{
-            minHeight: 44,
-            minWidth: 64,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 10,
-            backgroundColor: draft.trim() ? '#047857' : '#E2E8F0',
-          }}
-        >
-          <Text style={{ color: draft.trim() ? '#FFFFFF' : '#475569', fontWeight: '600' }}>Add</Text>
-        </PressableBase>
-      </View>
-      {error ? (
-        <Text accessibilityRole="alert" style={{ color: '#B91C1C', fontSize: 13 }}>
-          {error}
-        </Text>
+    <View style={{ gap: 12 }}>
+      {items.length > 0 ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {items.map((s) => (
+            <PressableBase
+              key={s}
+              onPress={() => onChange(items.filter((i) => i !== s))}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${s}`}
+              android_ripple={{ color: colors.bgSoft }}
+              pressFeedback={0.7}
+              // Layout NEVER goes in a style callback — see `PressableBase`.
+              style={{
+                minHeight: 44,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 12,
+                borderRadius: tokens.radii.pill,
+                borderWidth: 1,
+                borderColor: colors.borderStrong,
+              }}
+            >
+              <Text role="bodySmMedium">{s}</Text>
+              <Icon name="x" size={16} color={colors.textSecondary} />
+            </PressableBase>
+          ))}
+        </View>
       ) : null}
+      {/* Field above, Add below: the pair never has to share a row, so it holds at 200% text
+          without either half being squeezed (design system §9). */}
+      <Input
+        label="Add a specialty"
+        value={draft}
+        // The field itself stops well short of the limit the validator enforces, so a paste can
+        // never leave the coach staring at a length error they cannot see the end of.
+        onChangeText={(next) => setDraft(next.slice(0, SPECIALTY_MAX_LENGTH * 2))}
+        onSubmitEditing={() => {
+          commit();
+          onSubmitEditing?.();
+        }}
+        placeholder="Strength, mobility, …"
+        error={error}
+        returnKeyType={returnKeyType}
+        autoCapitalize="words"
+      />
+      <Button
+        label="Add specialty"
+        onPress={commit}
+        disabled={draft.trim().length === 0}
+        variant="secondary"
+        leadingIcon="plus"
+        fullWidth
+      />
     </View>
   );
 }

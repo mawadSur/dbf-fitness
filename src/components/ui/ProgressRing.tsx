@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import { Animated, Easing, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Circle, Svg } from 'react-native-svg';
+import { Circle, Svg, type CircleProps } from 'react-native-svg';
 
 import { useOptionalTheme, useReducedMotion } from '../../theme/ThemeProvider';
 import { motion, type ThemeColors } from '../../theme/tokens';
@@ -8,7 +8,31 @@ import { svgAccessibilityProps } from './a11y';
 import { clampProgress, duration, progressFraction } from './layout';
 import { Text } from './Typography';
 
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+/**
+ * `Circle` with `collapsable` swallowed before it can reach the node.
+ *
+ * `Animated.createAnimatedComponent` does not pass `collapsable` through — the
+ * Animated internals FORCE it on: `useAnimatedProps` sets `collapsable: false`
+ * on every animated component so the native view is never flattened away. That
+ * is meaningful for a native `View`, but an SVG `Circle` is not one:
+ * `react-native-svg` spreads what it does not recognise straight onto the node,
+ * so the ring logged a dev error on every mount —
+ *
+ *   Received `false` for a non-boolean attribute `collapsable`.
+ *
+ * on web, and the same complaint as a red LogBox toast on Android, which is
+ * what made `app/dev/gallery.tsx` (the one screen that mounts three rings) pop
+ * a toast the moment it opened. Dropping the prop here is the narrowest fix:
+ * the ref still forwards, so Animated keeps driving `strokeDashoffset`.
+ */
+const CollapsableFreeCircle = forwardRef<
+  React.ComponentRef<typeof Circle>,
+  CircleProps & { collapsable?: boolean }
+>(function CollapsableFreeCircle({ collapsable: _collapsable, ...props }, ref) {
+  return <Circle ref={ref} {...props} />;
+});
+
+const AnimatedCircle = Animated.createAnimatedComponent(CollapsableFreeCircle);
 
 export type ProgressRingProps = {
   value: number;

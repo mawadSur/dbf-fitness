@@ -59,8 +59,21 @@ describe('every KeyboardAvoidingView call site', () => {
     .filter(({ src }) => /<KeyboardAvoidingView\b/.test(src));
 
   it('finds the known call sites (guards against this scan going blind)', () => {
-    // 8th site: `src/components/ui/ScreenShell.tsx`, the design-system shell.
-    expect(sites.length).toBe(8);
+    // Screens migrated onto the design system get keyboard avoidance from
+    // `ScreenShell keyboardAvoiding`, so the number of RAW call sites shrinks as
+    // the redesign lands. A fixed count would only record how far that has got;
+    // what must never happen is the scan finding nothing (which would make every
+    // assertion below pass vacuously) or losing the shell itself.
+    const files = sites.map((s) => s.file.replace(root + '/', ''));
+    expect(files).toContain('src/components/ui/ScreenShell.tsx');
+    expect(sites.length).toBeGreaterThanOrEqual(2);
+    // Whatever is left, no screen may hand-roll the behavior — asserted per file below.
+    expect(files.every((file) => /\.tsx$/.test(file))).toBe(true);
+    // Screens that stage 2 folded into the shell must NOT re-open a raw one: the shell
+    // owns their keyboard handling now. (Regression guard from the account stream.)
+    for (const migrated of ['app/(tabs)/profile.tsx', 'app/coach/profile.tsx']) {
+      expect(files).not.toContain(migrated);
+    }
   });
 
   it.each(sites.map((s) => [s.file.replace(root + '/', ''), s.src] as const))(

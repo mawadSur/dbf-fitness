@@ -1,86 +1,34 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, View } from 'react-native';
 
 import { friendlyErrorMessage } from '../../src/components/friendlyError';
-import { ChecklistRow } from '../../src/components/ChecklistRow';
+import {
+  Banner,
+  ChecklistRow,
+  EmptyState,
+  Eyebrow,
+  ScreenHeader,
+  ScreenShell,
+  Text,
+} from '../../src/components/ui';
+import { CardListSkeleton, RetryState } from '../../src/components/workout/ListStates';
 import { todayDateString as computeTodayDateString } from '../../src/features/diet/dates';
+import { dayHeading, dietProgress } from '../../src/features/diet/dayLabel';
+import {
+  fetchDietPlan,
+  fetchTodaysCheckins,
+  toggleCheckin,
+  type DietItemRow,
+} from '../../src/features/diet/queries';
+import { useDelayedVisible } from '../../src/components/ui/useDelayedVisible';
 import { supabase } from '../../src/services/supabase/client';
-import { colors } from '../../src/theme/tokens';
-
-type DietItemRow = {
-  id: string;
-  name: string;
-  description: string | null;
-  order_index: number;
-};
-
-type DietPlanDetail = {
-  title: string;
-  description: string | null;
-  items: DietItemRow[];
-} | null;
-
-async function fetchDietPlan(memberId: string): Promise<DietPlanDetail> {
-  const { data: assignment, error: assignmentError } = await supabase
-    .from('diet_plan_assignments')
-    .select('diet_plan_id')
-    .eq('member_id', memberId)
-    .order('assigned_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (assignmentError) throw assignmentError;
-  if (!assignment) return null;
-
-  const { data: plan, error: planError } = await supabase
-    .from('diet_plans')
-    .select('title, description')
-    .eq('id', assignment.diet_plan_id)
-    .single();
-  if (planError) throw planError;
-
-  const { data: items, error: itemsError } = await supabase
-    .from('diet_items')
-    .select('id, name, description, order_index')
-    .eq('diet_plan_id', assignment.diet_plan_id)
-    .order('order_index', { ascending: true });
-  if (itemsError) throw itemsError;
-
-  return {
-    title: plan.title,
-    description: plan.description,
-    items: items ?? [],
-  };
-}
-
-async function fetchTodaysCheckins(
-  memberId: string,
-  todayDateString: string
-): Promise<Set<string>> {
-  const { data, error } = await supabase
-    .from('diet_checkins')
-    .select('diet_item_id')
-    .eq('member_id', memberId)
-    .eq('checkin_date', todayDateString);
-  if (error) throw error;
-  return new Set((data ?? []).map((row) => row.diet_item_id));
-}
 
 export default function FoodScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isSessionReady, setIsSessionReady] = useState(false);
   // UTC day, matching the streak view and the diet_checkins RLS window (see features/diet/dates.ts).
   const todayDateString = computeTodayDateString();
-  const insets = useSafeAreaInsets();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const queryClient = useQueryClient();
 
@@ -115,23 +63,7 @@ export default function FoodScreen() {
   const toggleMutation = useMutation({
     mutationFn: async ({ itemId, isChecked }: { itemId: string; isChecked: boolean }) => {
       if (!userId) throw new Error('Not signed in.');
-
-      if (isChecked) {
-        const { error } = await supabase
-          .from('diet_checkins')
-          .delete()
-          .eq('member_id', userId)
-          .eq('diet_item_id', itemId)
-          .eq('checkin_date', todayDateString);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('diet_checkins').insert({
-          member_id: userId,
-          diet_item_id: itemId,
-          checkin_date: todayDateString,
-        });
-        if (error) throw error;
-      }
+      await toggleCheckin({ memberId: userId, itemId, isChecked, todayDateString });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -140,135 +72,151 @@ export default function FoodScreen() {
     },
   });
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
       await Promise.all([planQuery.refetch(), checkinsQuery.refetch()]);
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [planQuery, checkinsQuery]);
 
-  if (!isSessionReady || !userId || planQuery.isLoading) {
+  const checkedIds = useMemo(
+    () => checkinsQuery.data ?? new Set<string>(),
+    [checkinsQuery.data],
+  );
+
+  // Only the row being saved goes disabled — locking the whole list for one
+  // tick would make a slow connection feel broken.
+  const pendingItemId = toggleMutation.isPending ? toggleMutation.variables.itemId : null;
+
+  const renderItem = useCallback(
+    ({ item }: { item: DietItemRow }) => (
+      <ChecklistRow
+        label={item.name}
+        sublabel={item.description ?? undefined}
+        checked={checkedIds.has(item.id)}
+        disabled={pendingItemId === item.id}
+        onToggle={() =>
+          toggleMutation.mutate({ itemId: item.id, isChecked: checkedIds.has(item.id) })
+        }
+        testID={`food-item-${item.id}`}
+      />
+    ),
+    [checkedIds, pendingItemId, toggleMutation],
+  );
+
+  const isFirstLoad = !isSessionReady || !userId || planQuery.isLoading;
+  const showSkeleton = useDelayedVisible(isFirstLoad);
+  const header = <ScreenHeader title="Food" eyebrow={dayHeading(todayDateString)} />;
+
+  if (isFirstLoad) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator color={colors.primary} />
-      </View>
+      <ScreenShell insideTabs testID="food" header={header}>
+        <CardListSkeleton count={4} visible={showSkeleton} testID="food-skeleton" />
+      </ScreenShell>
     );
   }
 
-  const refreshControl = <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} />;
-
   if (planQuery.isError) {
     return (
-      <ScrollView
-        className="flex-1 bg-white"
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          gap: 8,
-          paddingHorizontal: 24,
-          paddingTop: insets.top + 16,
-        }}
-        refreshControl={refreshControl}
+      <ScreenShell
+        insideTabs
+        testID="food"
+        header={header}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}
       >
-        <Text accessibilityRole="alert" className="text-center text-base text-red-700">
-          {friendlyErrorMessage(planQuery.error, 'Could not load your diet plan.')}
-        </Text>
-        <Pressable
-          onPress={() => planQuery.refetch()}
-          accessibilityRole="button"
-          accessibilityLabel="Try again"
-          android_ripple={{ color: colors.primaryMuted }}
-          className="min-h-[44px] items-center justify-center px-4"
-          style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
-        >
-          <Text className="text-base font-semibold text-emerald-700">Try again</Text>
-        </Pressable>
-      </ScrollView>
+        <RetryState
+          title={friendlyErrorMessage(planQuery.error, 'Could not load your diet plan.')}
+          message="Your plan is safe — this was only a problem loading it."
+          onRetry={() => planQuery.refetch()}
+          busy={isRefreshing}
+          testID="food-error"
+        />
+      </ScreenShell>
     );
   }
 
   if (!planQuery.data) {
     return (
-      <ScrollView
-        className="flex-1 bg-white"
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-          paddingHorizontal: 24,
-          paddingTop: insets.top + 16,
-        }}
-        refreshControl={refreshControl}
+      <ScreenShell
+        insideTabs
+        testID="food"
+        header={header}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}
       >
-        <Text className="text-center text-base text-slate-600">
-          No diet plan assigned yet — check back soon.
-        </Text>
-      </ScrollView>
+        <EmptyState
+          icon="clock"
+          title="No diet plan yet"
+          message="No diet plan assigned yet — check back soon. Pull down to look again."
+          testID="food-empty"
+        />
+      </ScreenShell>
     );
   }
 
   const { title, description, items } = planQuery.data;
-  const checkedIds = checkinsQuery.data ?? new Set<string>();
+  const checkedInPlan = items.filter((item) => checkedIds.has(item.id)).length;
 
   return (
-    <FlatList
-      className="flex-1 bg-white"
-      data={items}
-      keyExtractor={(item) => item.id}
-      contentContainerClassName="gap-3 px-6 pb-10"
-      contentContainerStyle={{ paddingTop: insets.top + 16 }}
-      keyboardShouldPersistTaps="handled"
-      refreshControl={refreshControl}
-      ListHeaderComponent={
-        <View className="gap-1 pb-1">
-          <Text className="text-xs font-semibold uppercase text-slate-600">Food</Text>
-          <Text
-            accessibilityRole="header"
-            numberOfLines={2}
-            className="text-2xl font-bold text-slate-900"
-          >
-            {title}
-          </Text>
-          {description ? <Text className="text-sm text-slate-600">{description}</Text> : null}
-        </View>
-      }
-      ListFooterComponent={
-        <>
-          {checkinsQuery.isError ? (
-            <Text accessibilityRole="alert" className="pt-3 text-center text-sm text-red-700">
-              {friendlyErrorMessage(
-                checkinsQuery.error,
-                "Could not load today's check-ins. Pull down to retry."
-              )}
-            </Text>
-          ) : null}
-          {toggleMutation.isError ? (
+    <ScreenShell insideTabs scroll={false} testID="food" header={header}>
+      <FlatList
+        testID="food-list"
+        data={items}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ItemSeparatorComponent={Separator}
+        refreshing={isRefreshing}
+        onRefresh={handleRefresh}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 24 }}
+        ListHeaderComponent={
+          <View style={{ gap: 4, paddingBottom: 16 }}>
+            <Eyebrow tone="muted">{title}</Eyebrow>
+            {description ? <Text tone="secondary">{description}</Text> : null}
             <Text
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite"
-              className="pt-3 text-center text-sm text-red-700"
+              role="label"
+              accessibilityLabel={`Progress, ${dietProgress(checkedInPlan, items.length)}`}
             >
-              {friendlyErrorMessage(toggleMutation.error, 'Could not save that change.')}
+              {dietProgress(checkedInPlan, items.length)}
             </Text>
-          ) : null}
-        </>
-      }
-      renderItem={({ item }) => (
-        <ChecklistRow
-          label={item.name}
-          sublabel={item.description ?? undefined}
-          checked={checkedIds.has(item.id)}
-          onToggle={() =>
-            toggleMutation.mutate({
-              itemId: item.id,
-              isChecked: checkedIds.has(item.id),
-            })
-          }
-        />
-      )}
-    />
+          </View>
+        }
+        ListEmptyComponent={
+          <EmptyState
+            icon="info"
+            title="Nothing on the list yet"
+            message="Your coach hasn't added anything to this plan."
+            testID="food-no-items"
+          />
+        }
+        ListFooterComponent={
+          <View style={{ gap: 12, paddingTop: 16 }}>
+            {checkinsQuery.isError ? (
+              <Banner
+                tone="warning"
+                title={friendlyErrorMessage(
+                  checkinsQuery.error,
+                  "Could not load today's check-ins. Pull down to retry.",
+                )}
+                testID="food-checkins-error"
+              />
+            ) : null}
+            {toggleMutation.isError ? (
+              <Banner
+                tone="danger"
+                title={friendlyErrorMessage(toggleMutation.error, 'Could not save that change.')}
+                testID="food-toggle-error"
+              />
+            ) : null}
+          </View>
+        }
+      />
+    </ScreenShell>
   );
 }
+
+const keyExtractor = (item: DietItemRow) => item.id;
+const Separator = () => <View style={{ height: 12 }} />;

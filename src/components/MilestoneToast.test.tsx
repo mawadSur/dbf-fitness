@@ -1,7 +1,9 @@
-import { act, render, screen } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { AccessibilityInfo, Animated, PixelRatio, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { MILESTONE_TOAST_SKINS, milestoneAnnouncement } from '../features/milestones/toastCopy';
+import { milestoneTiers, type MilestoneTier } from '../theme/tokens';
 import { MilestoneToast } from './MilestoneToast';
 
 function withInsets(ui: React.ReactElement, top = 47) {
@@ -58,5 +60,53 @@ describe('MilestoneToast', () => {
       jest.advanceTimersByTime(10000);
     });
     expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it('tapping dismiss calls back once', async () => {
+    const onDismiss = jest.fn();
+    await render(withInsets(<MilestoneToast tier="firstDay" visible onDismiss={onDismiss} />));
+    await fireEvent.press(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  // Each tier is told apart by medallion + icon + words, never by hue alone.
+  const tiers: MilestoneTier[] = ['firstDay', 'sevenDayStreak', 'thirtyDayStreak'];
+  it.each(tiers)('gives %s its own medallion, sentence and announcement', async (tier) => {
+    await render(withInsets(<MilestoneToast tier={tier} visible onDismiss={jest.fn()} />));
+    const skin = MILESTONE_TOAST_SKINS[tier];
+    expect(screen.getByTestId(`milestone-badge-${tier}`)).toBeTruthy();
+    expect(screen.getByText(milestoneTiers[tier].label)).toBeTruthy();
+    expect(screen.getByText(skin.caption)).toBeTruthy();
+    expect(screen.getByText(skin.message)).toBeTruthy();
+
+    let toast = screen.getByText('Milestone unlocked').parent;
+    while (toast && toast.props.accessibilityRole !== 'alert') toast = toast.parent;
+    expect(toast?.props.accessibilityLabel).toBe(milestoneAnnouncement(tier));
+  });
+
+  it('the three tiers never share a medallion tone, icon or sentence', () => {
+    const skins = tiers.map((tier) => MILESTONE_TOAST_SKINS[tier]);
+    for (const key of ['tone', 'icon', 'message', 'caption'] as const) {
+      expect(new Set(skins.map((skin) => skin[key])).size).toBe(3);
+    }
+  });
+
+  it('with reduced motion on it appears at once instead of animating', async () => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
+    const timing = jest.spyOn(Animated, 'timing');
+    await act(async () => {
+      await render(withInsets(<MilestoneToast tier="thirtyDayStreak" visible onDismiss={jest.fn()} />));
+    });
+    expect(timing).not.toHaveBeenCalled();
+    jest.restoreAllMocks();
+  });
+
+  it('stacks the medallion above the copy at 130% text', async () => {
+    jest.spyOn(PixelRatio, 'getFontScale').mockReturnValue(1.3);
+    await render(withInsets(<MilestoneToast tier="firstDay" visible onDismiss={jest.fn()} />));
+    let toast = screen.getByText('Milestone unlocked').parent;
+    while (toast && toast.props.accessibilityRole !== 'alert') toast = toast.parent;
+    expect(StyleSheet.flatten(toast?.props.style).flexDirection).toBe('column');
+    jest.restoreAllMocks();
   });
 });
