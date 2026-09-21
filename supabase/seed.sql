@@ -244,3 +244,87 @@ where e.name = pin.name
     from public.workout_days
     where workout_plan_id = '33333333-3333-3333-3333-333333333333'
   );
+
+-- ---------------------------------------------------------------------------
+-- D1b.4 — the starter plan template.
+--
+-- Same three-day structure as Jordan's seeded "Foundations - Month 1", written
+-- in the plan-draft jsonb shape so it goes through plan_draft_normalize() like
+-- any coach-authored draft. choose_coach() materialises it for any member who
+-- picks a coach while having no plan (source 'starter', needs_tailoring true).
+--
+-- `is_starter` is enforced unique by plan_templates_one_starter_idx, so this
+-- insert is guarded rather than blind: re-running the seed must not fail.
+-- ---------------------------------------------------------------------------
+
+insert into public.plan_templates (title, description, is_starter, template)
+select
+  'Foundations - Month 1',
+  'A three-day bodyweight starter your coach will tailor to you.',
+  true,
+  jsonb_build_object(
+    'title', 'Foundations - Month 1',
+    'description', 'A three-day bodyweight starter your coach will tailor to you.',
+    'days', jsonb_build_array(
+      jsonb_build_object(
+        'id', null, 'day_number', 1,
+        'block_name', 'Cardio in Place — Foundation & Technique',
+        'duration_minutes', 25,
+        'exercises', jsonb_build_array(
+          jsonb_build_object('id', null, 'position', 0, 'name', 'High Knees',
+            'exercise_key', 'high-knees', 'image_key', 'high-knees',
+            'detail', 'Drive the knees to hip height, stay light on the feet.',
+            'video_url', null,
+            'prescription', jsonb_build_object('mode', 'seconds', 'sets', 3, 'seconds', 30, 'rest_seconds', 30)),
+          jsonb_build_object('id', null, 'position', 1, 'name', 'Burpees',
+            'exercise_key', 'burpee', 'image_key', 'burpee',
+            'detail', 'Step back instead of jumping if you need to.',
+            'video_url', null,
+            'prescription', jsonb_build_object('mode', 'reps', 'sets', 3, 'reps_min', 5, 'rest_seconds', 45)),
+          jsonb_build_object('id', null, 'position', 2, 'name', 'Mountain Climbers',
+            'exercise_key', 'mountain-climber', 'image_key', 'mountain-climber',
+            'detail', 'Hips low, shoulders stacked over the wrists.',
+            'video_url', null,
+            'prescription', jsonb_build_object('mode', 'seconds', 'sets', 3, 'seconds', 30, 'rest_seconds', 30)))),
+      jsonb_build_object(
+        'id', null, 'day_number', 2,
+        'block_name', 'Lower Body — Foundation & Technique',
+        'duration_minutes', 30,
+        'exercises', jsonb_build_array(
+          jsonb_build_object('id', null, 'position', 0, 'name', 'Bodyweight Squats',
+            'exercise_key', 'bodyweight-squat', 'image_key', 'bodyweight-squat',
+            'detail', 'Sit back into the hips, knees tracking over the toes.',
+            'video_url', null,
+            'prescription', jsonb_build_object('mode', 'range', 'sets', 3, 'reps_min', 10, 'reps_max', 12, 'rest_seconds', 60)),
+          jsonb_build_object('id', null, 'position', 1, 'name', 'Walking Lunges',
+            'exercise_key', 'walking-lunge', 'image_key', 'walking-lunge',
+            'detail', 'Count the reps per leg, not in total.',
+            'video_url', null,
+            'prescription', jsonb_build_object('mode', 'per_side', 'sets', 3, 'reps_min', 10, 'rest_seconds', 60)),
+          jsonb_build_object('id', null, 'position', 2, 'name', 'Plank Hold',
+            'exercise_key', 'plank', 'image_key', 'plank',
+            'detail', 'Ribs down, glutes on — stop the set when the hips sag.',
+            'video_url', null,
+            'prescription', jsonb_build_object('mode', 'seconds', 'sets', 3, 'seconds', 45, 'rest_seconds', 45)))),
+      jsonb_build_object(
+        'id', null, 'day_number', 3,
+        'block_name', 'Upper Body — Foundation & Technique',
+        'duration_minutes', 25,
+        'exercises', jsonb_build_array(
+          jsonb_build_object('id', null, 'position', 0, 'name', 'Push-Ups',
+            'exercise_key', 'push-up', 'image_key', 'push-up',
+            'detail', 'Hands under the shoulders; drop to the knees to keep the range.',
+            'video_url', null,
+            'prescription', jsonb_build_object('mode', 'range', 'sets', 3, 'reps_min', 8, 'reps_max', 10, 'rest_seconds', 60)),
+          jsonb_build_object('id', null, 'position', 1, 'name', 'Plank Hold',
+            'exercise_key', 'plank', 'image_key', 'plank',
+            'detail', 'Ribs down, glutes on — stop the set when the hips sag.',
+            'video_url', null,
+            'prescription', jsonb_build_object('mode', 'seconds', 'sets', 3, 'seconds', 45, 'rest_seconds', 45)),
+          jsonb_build_object('id', null, 'position', 2, 'name', 'Burpees',
+            'exercise_key', 'burpee', 'image_key', 'burpee',
+            'detail', 'Finish the session with something that raises the heart rate.',
+            'video_url', null,
+            'prescription', jsonb_build_object('mode', 'amrap', 'seconds', 120))))
+    ))
+where not exists (select 1 from public.plan_templates where is_starter);
