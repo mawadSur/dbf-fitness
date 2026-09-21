@@ -1,8 +1,9 @@
 import { PixelRatio, useWindowDimensions, View } from 'react-native';
 
-import { shouldStackControls } from '../../features/liveClasses/controlBarLayout';
+import { controlBarRows } from '../../features/liveClasses/controlBarLayout';
 import { useOptionalTheme } from '../../theme/ThemeProvider';
-import { Button, FixedFooter, screenGutter } from '../ui';
+import { FixedFooter, screenGutter } from '../ui';
+import { CallControlButton } from './CallControlButton';
 
 type Props = {
   muted: boolean;
@@ -22,18 +23,57 @@ type Props = {
  * Every toggle states itself twice: the icon changes AND the label changes, so
  * mute/camera are never signalled by colour alone.
  *
- * Layout: the two toggles share one row and Leave takes the row below it. Three
- * labelled buttons abreast do not fit a 360–390pt phone — "Camera off" wrapped
- * mid-word to "Came / ra off" — and giving Leave its own full-width row also
- * puts the one destructive control where it cannot be hit by accident. At 130%
- * text or more even two toggles stop sharing a row, so they stack as well.
+ * Layout: the controls are COMPACT (icon above label), so all three fit one row
+ * from 360pt — the labelled-`Button` bar they replace took two rows at 390pt and
+ * three at 360pt, which pushed the video stage below the fold on a 360x640
+ * phone. Only very large text (about 175%+ on a 360pt screen) splits the row,
+ * and then Leave drops below the two toggles rather than every control stacking.
  */
 export function CallControlsBar({ muted, cameraOff, onToggleMute, onToggleCamera, onLeave }: Props) {
   const { tokens } = useOptionalTheme();
   const { width } = useWindowDimensions();
-  const stacked = shouldStackControls(PixelRatio.getFontScale(), width - screenGutter(width) * 2);
+  const rows = controlBarRows(PixelRatio.getFontScale(), width - screenGutter(width) * 2);
 
-  const grow = stacked ? undefined : { flex: 1 };
+  const grow = { flex: 1 };
+  // 1 row: everything abreast. 2 rows: toggles abreast, Leave below.
+  // 3 rows: one control per row (only at very large text on a narrow screen).
+  const togglesInRow = rows < 3;
+  const leaveInRow = rows === 1;
+
+  const mute = (
+    <CallControlButton
+      key="mute"
+      testID="call-controls-mute"
+      label={muted ? 'Unmute' : 'Mute'}
+      icon={muted ? 'mic-off' : 'mic'}
+      onPress={onToggleMute}
+      accessibilityLabel={muted ? 'Unmute my microphone' : 'Mute my microphone'}
+      style={grow}
+    />
+  );
+  const camera = (
+    <CallControlButton
+      key="camera"
+      testID="call-controls-camera"
+      label={cameraOff ? 'Camera on' : 'Camera off'}
+      icon={cameraOff ? 'camera-off' : 'video'}
+      onPress={onToggleCamera}
+      accessibilityLabel={cameraOff ? 'Turn my camera on' : 'Turn my camera off'}
+      style={grow}
+    />
+  );
+  const leave = (
+    <CallControlButton
+      key="leave"
+      testID="call-controls-leave"
+      label="Leave"
+      icon="log-out"
+      tone="danger"
+      onPress={onLeave}
+      accessibilityLabel="Leave the class"
+      style={grow}
+    />
+  );
 
   return (
     <FixedFooter testID="call-controls">
@@ -41,39 +81,16 @@ export function CallControlsBar({ muted, cameraOff, onToggleMute, onToggleCamera
         <View
           testID="call-controls-row"
           style={{
-            flexDirection: stacked ? 'column' : 'row',
+            flexDirection: togglesInRow ? 'row' : 'column',
             alignItems: 'stretch',
             gap: tokens.space.sm,
           }}
         >
-          <Button
-            label={muted ? 'Unmute' : 'Mute'}
-            leadingIcon={muted ? 'mic-off' : 'mic'}
-            variant="secondary"
-            onPress={onToggleMute}
-            accessibilityLabel={muted ? 'Unmute my microphone' : 'Mute my microphone'}
-            fullWidth={stacked}
-            style={grow}
-          />
-          <Button
-            label={cameraOff ? 'Camera on' : 'Camera off'}
-            leadingIcon={cameraOff ? 'camera-off' : 'video'}
-            variant="secondary"
-            onPress={onToggleCamera}
-            accessibilityLabel={cameraOff ? 'Turn my camera on' : 'Turn my camera off'}
-            fullWidth={stacked}
-            style={grow}
-          />
+          {mute}
+          {camera}
+          {leaveInRow ? leave : null}
         </View>
-        <Button
-          testID="call-controls-leave"
-          label="Leave"
-          leadingIcon="log-out"
-          variant="danger"
-          onPress={onLeave}
-          accessibilityLabel="Leave the class"
-          fullWidth
-        />
+        {leaveInRow ? null : leave}
       </View>
     </FixedFooter>
   );

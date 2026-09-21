@@ -121,7 +121,10 @@ describe('live schedule screen', () => {
     ]);
     await renderWithQuery(<ScheduleScreen />);
 
-    expect(await screen.findByText('Live now')).toBeTruthy();
+    // The section header says "Live now"; since the countdown is now derived
+    // from STATUS first, the card's timing line says "Live now" too instead of
+    // a stale "Starts in ..." / "Started 5 min ago".
+    expect(await screen.findAllByText('Live now')).toHaveLength(2);
     expect(screen.getByText('Live')).toBeTruthy();
   });
 
