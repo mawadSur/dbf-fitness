@@ -10,7 +10,9 @@ Everything here needs accounts or decisions the codebase cannot provision. Every
 | **User-generated content (Apple 1.2)** | Report and block exist. EULA/terms acceptance, objectionable-content filtering, and a published contact method do NOT |
 | First-run coach onboarding | Not built; new sign-ups have `coach_id` null (coach-selection screen is in progress) |
 | Monitoring / crash reporting | Not set up (no Sentry/Crashlytics, no function alerting) |
-| Payment webhook | Not built; nothing writes `public.subscriptions` except manual/seed rows |
+| Payment webhook | **Still not built.** Payments happen outside the app, so the backend path is now admin mark-paid: `public.admin_mark_paid` / `admin_cancel_subscription` / `admin_list_subscriptions` (migration `20260921130000`) write `public.subscriptions` + the append-only `public.subscription_events` ledger, admin-gated in-body. No provider webhook and **no admin UI screen** yet — an admin must call the RPC by hand |
+| Admin MFA (TOTP) | `[auth.mfa.totp]` enroll/verify are enabled in `supabase/config.toml`, but the admin RPCs demand `aal2` **only from an admin who already has a verified TOTP factor** (`public.admin_mfa_required()`); an admin with no factor still passes, so SQL-created admins cannot lock themselves out. Interim rule — decide before launch whether to make TOTP mandatory for admins |
+| Moderation queue | Backend **done** (migration `20260921131000`): admin-only queue, `admin_list_reports` / `review_report` / `remove_from_group`, append-only `public.moderation_actions` audit, and the accused can never read a report about themselves. Coaches are no longer moderators. **No moderation UI** — reports can be filed but only reviewed via RPC |
 | `live-class-reminder` scheduling | pg_cron/pg_net or scheduled invocation not configured |
 
 ## Accounts and stores
