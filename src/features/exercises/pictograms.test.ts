@@ -134,10 +134,50 @@ describe('the poses read as the movement', () => {
       expect(jointAngle(frame.shoulder, frame.near.elbow, frame.near.wrist)).toBeGreaterThan(165);
       expect(frame.near.wrist.y).toBeGreaterThan(frame.shoulder.y);
     }
-    // Driven knee is forward of the hip and tucked up towards the chest.
-    expect(a.near.knee.x).toBeGreaterThan(a.hip.x);
-    expect(a.near.knee.y).toBeLessThan(a.hip.y + 4);
-    expect(b.far.knee.x).toBeGreaterThan(b.hip.x);
+    // Driven knee is forward of the hip and tucked up towards the chest. The
+    // FAR leg drives first so that the LAST frame — the one the 56pt thumbnail
+    // shows — draws the tucked knee in the heavy near-side ink.
+    expect(a.far.knee.x).toBeGreaterThan(a.hip.x);
+    expect(b.near.knee.x).toBeGreaterThan(b.hip.x);
+    expect(b.near.knee.y).toBeLessThan(b.hip.y + 4);
+  });
+
+  it('strength fallback: a hinged row, not a figure standing still', () => {
+    const [hang, pull] = pictograms.strength.frames.map(resolvePose);
+    for (const frame of [hang, pull]) {
+      // Hinged at the hips: the shoulder is well forward of the hip, which a
+      // standing figure (the biceps curl this replaced) never is.
+      expect(frame.shoulder.x - frame.hip.x).toBeGreaterThan(15);
+      expect(frame.near.ankle.y).toBeGreaterThan(frame.ground - 2);
+    }
+    // Arms hang straight down at the bottom of the rep.
+    expect(jointAngle(hang.shoulder, hang.near.elbow, hang.near.wrist)).toBeGreaterThan(170);
+    expect(hang.near.wrist.y - hang.near.elbow.y).toBeGreaterThan(10);
+    // The pull drives BOTH elbows back and above the line of the back, which
+    // is the mark that survives a 56pt tile.
+    for (const side of [pull.near, pull.far]) {
+      expect(side.elbow.x).toBeLessThan(pull.shoulder.x);
+      expect(side.elbow.y).toBeLessThan(pull.shoulder.y);
+      const bend = jointAngle(pull.shoulder, side.elbow, side.wrist);
+      expect(bend).toBeGreaterThan(30);
+      expect(bend).toBeLessThan(90);
+    }
+  });
+
+  it('plank and push-up thumbnails are told apart by where the head sits', () => {
+    // Both are a straight body a few units off the floor, so at 56px the only
+    // difference a tile can carry is the head: the plank looks DOWN and its
+    // head comes to rest just above the hands; the push-up lifts its chin a
+    // clear head's width above them.
+    const plank = resolvePose(pictograms.plank.frames[1]);
+    const push = resolvePose(pictograms['push-up'].frames[1]);
+    expect(plank.head.y).toBeGreaterThan(plank.shoulder.y);
+    expect(push.head.y).toBeLessThan(push.shoulder.y);
+    // Gap between the head and the hand it sits over, measured in head radii.
+    const plankGap = (plank.near.wrist.y - plank.head.y) / plank.headRadius;
+    const pushGap = (push.near.wrist.y - push.head.y) / push.headRadius;
+    expect(plankGap).toBeLessThan(1.6);
+    expect(pushGap).toBeGreaterThan(3);
   });
 
   it('burpee: crouch with hands down, then a plank, then a jump off the floor', () => {
@@ -151,6 +191,14 @@ describe('the poses read as the movement', () => {
     expect(jump.near.wrist.y).toBeLessThan(jump.head.y);
     expect(jump.near.ankle.y).toBeLessThan(jump.ground - 2);
     expect(jump.far.ankle.y).toBeLessThan(jump.ground - 2);
+    // ...and the arms go up AROUND the head, not through it. Thrown straight
+    // up, both elbows landed inside the head circle and the frame read as a
+    // tangle; each elbow now clears the circle by more than half a radius.
+    for (const side of [jump.near, jump.far]) {
+      expect(Math.abs(side.elbow.x - jump.head.x)).toBeGreaterThan(jump.headRadius * 1.5);
+      // Hands above the crown, so the pose still reads as "arms overhead".
+      expect(side.wrist.y).toBeLessThan(jump.head.y - jump.headRadius);
+    }
   });
 
   it('every multi-frame pictogram actually changes between frames', () => {

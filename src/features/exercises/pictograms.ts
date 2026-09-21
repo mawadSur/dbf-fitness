@@ -131,20 +131,30 @@ export const pictograms = {
         farFoot: 0,
       }),
       frame(47.1, 70.2, HIGH_PLANK),
-      // Jump: both feet clear of the ground line, knees tucked, arms straight
-      // overhead in a shallow V. The hip sits low enough that the hands stay
-      // inside the box — arms angled out to the side read as a fall, not a jump.
-      frame(44, 58, {
-        nearUpperArm: -70,
-        nearForearm: -75,
-        farUpperArm: -110,
-        farForearm: -115,
-        nearThigh: -15,
-        nearShin: 100,
-        nearFoot: 0,
-        farThigh: -9,
-        farShin: 96,
-        farFoot: 0,
+      // Jump: both feet clear of the ground line, knees tucked, arms up.
+      //
+      // The arms used to be thrown STRAIGHT up (-70/-110 at the shoulder),
+      // which put both elbows at x≈44±5 — inside the 7-unit head circle. The
+      // two strokes crossed the head and the frame read as a tangle rather
+      // than as a jump ("arms sprout from behind the head"). They now leave
+      // the shoulder almost horizontally (-22/-158) and turn up at the elbow,
+      // so the elbows sit ~14 units out, clear of the head on both sides, and
+      // the silhouette is the unmistakable arms-up shape.
+      //
+      // The tuck is tighter and the hip higher than before so the feet clear
+      // the floor by ~13 units instead of ~18 of empty air: at 56px the old
+      // frame was cropped to a 97-unit square that was mostly nothing.
+      frame(44, 47, {
+        nearUpperArm: -22,
+        nearForearm: -80,
+        farUpperArm: -158,
+        farForearm: -100,
+        nearThigh: 45,
+        nearShin: 120,
+        nearFoot: 40,
+        farThigh: 50,
+        farShin: 115,
+        farFoot: 45,
       }),
     ],
   },
@@ -185,13 +195,12 @@ export const pictograms = {
     label: 'Mountain climber',
     category: 'core',
     alt: 'Figure in a straight-arm plank driving one knee in under the chest while the other leg stays extended, then swapping legs.',
+    // The FAR leg drives first and the NEAR leg second, so the frame the
+    // thumbnail shows (the last one) draws the tucked knee in the heavy "near"
+    // ink rather than in the lighter, thinner far-side stroke. At 56px the
+    // pale version of that knee was the only thing telling this tile apart
+    // from the push-up, and it was the faintest mark on it.
     frames: [
-      frame(47.1, 70.2, {
-        ...HIGH_PLANK,
-        nearThigh: -5,
-        nearShin: 130,
-        nearFoot: 90,
-      }),
       frame(47.1, 70.2, {
         ...HIGH_PLANK,
         nearThigh: 158,
@@ -200,6 +209,12 @@ export const pictograms = {
         farThigh: -5,
         farShin: 130,
         farFoot: 90,
+      }),
+      frame(47.1, 70.2, {
+        ...HIGH_PLANK,
+        nearThigh: -5,
+        nearShin: 130,
+        nearFoot: 90,
       }),
     ],
   },
@@ -223,9 +238,15 @@ export const pictograms = {
         farShin: 178,
         farFoot: 198,
       }),
+      // A forearm plank and the bottom of a push-up are the same straight body
+      // at nearly the same height, so at 56px the two tiles were one shape.
+      // The one thing that can carry the difference at that size is where the
+      // HEAD sits: here it is tipped down over the hands (neck +22) and comes
+      // to rest just above the forearms — the plank's "look at the floor" cue —
+      // while the push-up lifts its chin well clear of them (neck -30).
       frame(42.4, 77.7, {
         torso: -10.4,
-        neck: -8,
+        neck: 22,
         nearUpperArm: 90,
         nearForearm: -2,
         farUpperArm: 94,
@@ -246,9 +267,12 @@ export const pictograms = {
     alt: 'Figure at the top of a push-up with arms straight and the body in one line, then lowering until the elbows are bent about 90 degrees and the chest is close to the floor.',
     frames: [
       frame(47.1, 70.2, HIGH_PLANK),
+      // Chin lifted (see the plank's note): the head clears the hands by a
+      // head's width here and rests on them there, which is what separates the
+      // two tiles at 56px.
       frame(45.8, 75.4, {
         torso: -14.24,
-        neck: -5,
+        neck: -30,
         nearUpperArm: 134.4,
         nearForearm: 41.5,
         farUpperArm: 137,
@@ -322,16 +346,44 @@ export const pictograms = {
     key: 'strength',
     label: 'Strength',
     category: 'strength',
-    alt: 'Figure standing with arms down, then curling both forearms up and forward to chest height.',
+    alt: 'Figure hinged forward at the hips with both arms hanging straight down, then rowing: both elbows driven back and up past the ribs.',
+    // This was a standing biceps curl, and at 56px the thumbnail was a
+    // standing figure with a 6-unit stub for a forearm — indistinguishable
+    // from "person". A bent-over row is the strength cue that survives the
+    // tile: a hinged torso with two elbow spikes rising behind the back is a
+    // silhouette nothing else in this set has (the presses and jumps all put
+    // the arms overhead, where they collide with `default` and the burpee).
     frames: [
-      STAND,
-      // The forearms swing FORWARD, not up the side of the body: curled flat
-      // against the torso the movement was invisible at a glance.
-      frame(46, 54, {
-        nearUpperArm: 80,
-        nearForearm: -30,
-        farUpperArm: 92,
-        farForearm: -20,
+      // Hinge, arms hanging: the weight is at the bottom.
+      frame(34, 54, {
+        torso: -35,
+        neck: -45,
+        nearUpperArm: 90,
+        nearForearm: 90,
+        farUpperArm: 94,
+        farForearm: 86,
+        nearThigh: 95,
+        nearShin: 85,
+        nearFoot: 0,
+        farThigh: 92,
+        farShin: 88,
+        farFoot: 0,
+      }),
+      // The pull. The elbows go BACK and UP (-160 at the shoulder) and the
+      // hands come to the ribs, so the spikes sit above the line of the back.
+      frame(34, 54, {
+        torso: -35,
+        neck: -45,
+        nearUpperArm: 200,
+        nearForearm: 70,
+        farUpperArm: 204,
+        farForearm: 74,
+        nearThigh: 95,
+        nearShin: 85,
+        nearFoot: 0,
+        farThigh: 92,
+        farShin: 88,
+        farFoot: 0,
       }),
     ],
   },
