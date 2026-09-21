@@ -286,6 +286,32 @@ describe('live class screen states', () => {
     expect(screen.getByTestId('live-stage')).toBeTruthy();
   });
 
+  it('says preview mode once, inside the stage, not twice', async () => {
+    (fetchLiveClass as jest.Mock).mockResolvedValue(liveClass());
+    await renderWithQuery(<ClassScreen />);
+    await fireEvent.press(await screen.findByText('Join class'));
+
+    // A separate Banner above the stage used to repeat the tag word for word
+    // and cost 105pt of a 360x640 screen, pushing the video below the fold.
+    await screen.findByTestId('preview-mode');
+    expect(screen.getAllByTestId('preview-mode')).toHaveLength(1);
+    expect(screen.getAllByText('Preview mode')).toHaveLength(1);
+    expect(screen.getByTestId('live-stage-preview-tag')).toBeTruthy();
+  });
+
+  it('drops the schedule card in call and keeps the status in words', async () => {
+    (fetchLiveClass as jest.Mock).mockResolvedValue(liveClass());
+    await renderWithQuery(<ClassScreen />);
+    // Before joining, the full schedule card with the countdown is the point.
+    expect(await screen.findByTestId('class-summary')).toBeTruthy();
+
+    await fireEvent.press(await screen.findByText('Join class'));
+    await screen.findByTestId('live-stage');
+    expect(screen.queryByTestId('class-summary')).toBeNull();
+    // …replaced by one compact line, so status is still stated, not implied.
+    expect(screen.getByTestId('class-summary-compact')).toBeTruthy();
+  });
+
   it('a failed load offers one retry that refetches both queries', async () => {
     (fetchLiveClass as jest.Mock).mockRejectedValueOnce(new Error('network down'));
     await renderWithQuery(<ClassScreen />);

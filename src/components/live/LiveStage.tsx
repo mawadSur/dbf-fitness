@@ -33,22 +33,36 @@ export function LiveStage({ participants, availableWidth, preview = false }: Pro
       }}
     >
       {preview ? (
+        // The ONE place preview mode is announced. It used to be said twice —
+        // here and in a full `Banner` above the stage — and on a 360x640 phone
+        // the duplicate banner was 105pt of the 289pt the stage had to live in,
+        // so the video was cut off below the fold. The banner's reassurance
+        // moved in here as a caption instead of being dropped.
         <View
-          testID="live-stage-preview-tag"
+          testID="preview-mode"
+          accessible
+          accessibilityRole="alert"
+          accessibilityLabel="Preview mode. Live video isn’t switched on yet. Nothing is broadcast."
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
             alignSelf: 'flex-start',
-            gap: 6,
+            gap: 2,
             paddingHorizontal: 10,
             paddingVertical: 4,
-            borderRadius: 999,
+            borderRadius: 12,
             backgroundColor: VIDEO_SURFACE.captionPlate,
           }}
         >
-          <Icon name="info" size={16} color={VIDEO_SURFACE.onScrimMuted} />
-          <Text role="labelSm" color={VIDEO_SURFACE.onScrimMuted}>
-            Preview mode
+          <View
+            testID="live-stage-preview-tag"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          >
+            <Icon name="info" size={16} color={VIDEO_SURFACE.onScrimMuted} />
+            <Text role="labelSm" color={VIDEO_SURFACE.onScrimMuted}>
+              Preview mode
+            </Text>
+          </View>
+          <Text role="bodySm" color={VIDEO_SURFACE.onScrimMuted}>
+            Live video isn’t switched on yet. Nothing is broadcast.
           </Text>
         </View>
       ) : null}
