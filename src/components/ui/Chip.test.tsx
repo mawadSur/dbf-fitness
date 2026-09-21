@@ -119,7 +119,7 @@ describe('Chip', () => {
     it.each([
       ['radio', 'a single-select group such as Appearance'],
       ['checkbox', 'an independent filter toggle'],
-    ] as const)('maps to role=%s on web for %s', (selectionRole) => {
+    ] as const)('maps to role=%s on web for %s', (selectionRole, _usedFor) => {
       const on = chipAccessibilityProps('web', {
         label: 'Dark',
         selected: true,
