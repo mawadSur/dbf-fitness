@@ -45,7 +45,10 @@ Use the semantic name, never the shade. `bg-brand` survives a palette change;
 | on-cta | `text-on-cta` | `#FFFFFF` | `#022C22` | Label on a primary button |
 | sage | `bg-sage` | `#6EE7B7` | `#6EE7B7` | Dot texture, tints (decorative) |
 | progress-arc | `bg-progress-arc` | `#047857` | `#34D399` | Filled part of a progress ring/bar |
-| progress-track | `bg-progress-track` | `#6EE7B7` | `#065F46` | Unfilled part of a progress ring/bar |
+| progress-track | `bg-progress-track` | `#6EE7B7` | `#065F46` | Unfilled part of a progress **ring** |
+| progress-track-linear | `bg-progress-track-linear` | `#A7F3D0` | `#065F46` | Unfilled part of a **linear** bar |
+| disabled-bg | `bg-disabled` | `#DFE3E8` | `#35564C` | Fill of a disabled control |
+| disabled-fg | `text-disabled-fg` | `#374151` | `#C3D1CC` | Label/edge of a disabled control |
 | border-soft | `border-border-soft` | `#A7F3D0` | `#065F46` | Decorative hairlines only |
 | border-strong | `border-border-strong` | `#6B7280` | `#6EE7B7` | Inputs, selected states, essential edges |
 | focus | `border-focus` | `#059669` | `#34D399` | 2px focus ring |
@@ -71,6 +74,15 @@ on white), so the ring now has its own two tokens:
 Both are asserted as a `ui` pair in `contrast.test.ts`, and the track is
 additionally asserted as `decorative` against all four surfaces. `sage` keeps
 its decorative role (dot texture, tints).
+
+**A linear bar does not use the ring's track.** A ring is a 10pt stroke on a
+large circle, so the saturated light track (`#6EE7B7`) reads as "the empty
+part" there. A linear bar is a 6–8pt pill, and at that size the same mint reads
+as a FILLED bar — "0 of 4 done" and "Uploading 0%" both looked complete. Linear
+bars therefore take `progress-track-linear` (`#A7F3D0` in light: 4.27:1 under
+the arc, but only 1.28:1 against the page, so empty reads as empty). The dark
+track is already a recessed emerald-800, so the dark value is the same in both
+tokens and no component ever has to branch on the scheme.
 
 ### Four tokens differ from the original spec table
 
@@ -113,20 +125,27 @@ shadow.
 
 ### A disabled control is re-coloured, never faded
 
-`Button` keeps its shape when disabled — a filled variant stays filled, an
-outlined one stays outlined — and swaps its colours for `text-muted` on
-`bg-soft` (with `border-soft` where the variant had a border). It carries **no
-blanket opacity**.
+`Button`, `Chip` and `Input` keep their shape when disabled — a filled variant
+stays filled, an outlined one stays outlined — and swap their colours for the
+**disabled pair**, `disabled-fg` on `disabled-bg` (the edge of an outlined
+variant is drawn in `disabled-fg` too). They carry **no blanket opacity**.
 
 A single `opacity: 0.45` on the whole control looks fine in light mode and
 fails in dark. Both the fill and the label fade toward the page by the same
 alpha, so the bright dark-mode `cta` (#34D399) and the near-black `onCta`
 (#022C22) collapse toward `bg` (#011A14) and meet in the middle: the disabled
 "Sign in" / "Create account" / "Upload recording" label measured (14,80,59) on
-(24,108,79) = **1.48:1** on the Android emulator. `text-muted` on `bg-soft` is
-in the contrast table above, so the disabled state is ≥ 4.5:1 in both themes
-and `accessibilityState.disabled` still announces it. A *loading* button keeps
-its own colours, because the spinner is drawn in the variant's content colour.
+(24,108,79) = **1.48:1** on the Android emulator — and it is the first thing a
+new user sees.
+
+The disabled pair exists for nothing else, and `contrast.test.ts` asserts what
+an alpha can never satisfy: the fill is ≥ 3:1 away from the enabled `cta` and
+the label ≥ 3:1 away from `onCta`, so a disabled control is never a
+slightly-faded live one; the pair is ≥ 3:1 against itself (7.99:1 light,
+5.14:1 dark) and ≥ 1.2:1 against every surface, so the control neither shouts
+nor vanishes. `accessibilityState.disabled` still announces it and the press is
+dropped. A *loading* button keeps its own colours, because the spinner is drawn
+in the variant's content colour.
 
 ### Destructive actions carry the danger tone
 
@@ -175,6 +194,26 @@ weight at a time (importing the package root pulls in every weight and italic).
 - Motion: `motion.fast` 150ms, `motion.base` 250ms, `motion.slow` 350ms; exits
   run at `motion.exitRatio` (65%) of the enter duration; press feedback is
   scale 0.98 + opacity 0.92, which must not shift layout.
+
+### The Android ripple is derived, never a palette token
+
+`android_ripple` takes `rippleFor(<the control's content colour>)` — the
+content colour at `RIPPLE_ALPHA` (24%) — and never another opaque token.
+
+Handing it a solid token collides on a dark screen. A dark-theme `primary`
+button is `cta` #34D399 filled and used to be given `brand` #34D399 as its
+ripple: **the same colour**, so Android drew no press feedback at all and the
+only thing left was the 0.92 opacity, which on an already-dark page measured
+~0.985 of pixel change on device. Every `bgSoft` ripple had the same problem
+over the dark page (#022C22 ink on #011A14).
+
+The content colour cannot collide, because it is already ≥ 4.5:1 against its
+own fill. `src/theme/ripple.test.ts` composites the ink over every surface it
+is actually drawn on, in both themes, and fails below 1.2:1;
+`src/components/ui/pressRipple.test.tsx` asserts what each component passes,
+and `pressFeedback.test.tsx` asserts that the 0.92/0.98 pair lands on the same
+host node that carries the fill (dimming a child while the filled parent stays
+lit is not feedback).
 
 ## 5. Theme and reduced motion
 

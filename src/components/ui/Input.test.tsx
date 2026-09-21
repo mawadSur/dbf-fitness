@@ -1,7 +1,8 @@
 import { fireEvent, screen } from '@testing-library/react-native';
 
+import { contrastRatio } from '../../theme/contrast';
 import { Input, INPUT_MIN_HEIGHT } from './Input';
-import { colorsFor, flattenStyle, INCLUDING_HIDDEN, renderInTheme } from './testing';
+import { BOTH_THEMES, colorsFor, flattenStyle, INCLUDING_HIDDEN, renderInTheme } from './testing';
 
 const base = { label: 'Email', value: '', onChangeText: () => undefined };
 
@@ -130,11 +131,29 @@ describe('Input', () => {
     expect(style.textAlignVertical).toBe('top');
   });
 
-  it('is not editable and is dimmed when disabled', async () => {
+  it('is not editable when disabled, and says so', async () => {
     await renderInTheme(<Input {...base} disabled testID="field" />);
     expect(screen.getByTestId('field').props.editable).toBe(false);
     expect(screen.getByTestId('field').props.accessibilityState).toMatchObject({ disabled: true });
-    expect(fieldBox().opacity).toBe(0.45);
+  });
+
+  /**
+   * `opacity: 0.45` over the live skin faded the border, the value and the
+   * placeholder by the same alpha, so in dark mode a disabled field was a
+   * smudge you could not read the current value out of. The disabled pair
+   * replaces it — the field still SHOWS its value, it just cannot be edited.
+   */
+  it.each(BOTH_THEMES)('takes the disabled fill/label pair in %s, not an alpha', async (scheme) => {
+    const colors = colorsFor(scheme);
+    await renderInTheme(<Input {...base} value="jordan@example.test" disabled testID="field" />, scheme);
+    const box = fieldBox();
+    expect(box.opacity).toBeUndefined();
+    expect(box.backgroundColor).toBe(colors.disabledBg);
+    expect(box.borderColor).toBe(colors.disabledFg);
+    const field = screen.getByTestId('field');
+    expect(flattenStyle(field.props.style).color).toBe(colors.disabledFg);
+    expect(field.props.placeholderTextColor).toBe(colors.disabledFg);
+    expect(contrastRatio(colors.disabledFg, colors.disabledBg)).toBeGreaterThanOrEqual(3);
   });
 
   it('draws itself from the dark palette', async () => {

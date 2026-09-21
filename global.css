@@ -35,6 +35,12 @@
     --color-sage: 110 231 183;
     --color-progress-arc: 4 120 87;
     --color-progress-track: 110 231 183;
+    /* Linear bars only: the ring track is too saturated at 6-8px. */
+    --color-progress-track-linear: 167 243 208;
+
+    /* disabled controls (a fill/label pair, never a blanket opacity) */
+    --color-disabled-bg: 223 227 232;
+    --color-disabled-fg: 55 65 81;
 
     /* lines */
     --color-border-soft: 167 243 208;
@@ -71,6 +77,12 @@
     --color-sage: 110 231 183;
     --color-progress-arc: 52 211 153;
     --color-progress-track: 6 95 70;
+    /* The dark track is already recessed, so linear bars reuse its value. */
+    --color-progress-track-linear: 6 95 70;
+
+    /* disabled controls (a fill/label pair, never a blanket opacity) */
+    --color-disabled-bg: 53 86 76;
+    --color-disabled-fg: 195 209 204;
 
     /* lines */
     --color-border-soft: 6 95 70;

@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { rippleFor } from '../../theme/tokens';
 import { Icon } from './Icon';
 import { hitSlopFor, minTouchTarget, screenGutter } from './layout';
 import { PressableBase } from './PressableBase';
@@ -77,7 +78,7 @@ export function ScreenHeader({
             accessibilityRole="button"
             accessibilityLabel={backAccessibilityLabel}
             hitSlop={hitSlopFor(target, Platform.OS) + 4}
-            android_ripple={{ color: colors.bgSoft, borderless: true }}
+            android_ripple={{ color: rippleFor(colors.text), borderless: true }}
             // Layout NEVER goes in a style callback — see `PressableBase`.
             style={{ width: target, height: target, alignItems: 'center', justifyContent: 'center' }}
           >

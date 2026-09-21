@@ -1,7 +1,7 @@
 import { ActivityIndicator, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useOptionalTheme } from '../../theme/ThemeProvider';
-import type { ThemeColors } from '../../theme/tokens';
+import { rippleFor, type ThemeColors } from '../../theme/tokens';
 import { Icon } from './Icon';
 import type { IconName } from './icons';
 import { BUTTON_HEIGHT, hitSlopFor, type ButtonSize } from './layout';
@@ -27,22 +27,33 @@ export type ButtonProps = {
   testID?: string;
 };
 
-type Skin = { background: string; content: string; border: string | null; ripple: string };
+type Skin = { background: string; content: string; border: string | null };
+
+/**
+ * Android's press ink for a skin.
+ *
+ * Always derived from the skin's CONTENT colour, never from another opaque
+ * token: `primary` in the dark theme is `cta` #34D399 filled and used to be
+ * handed `brand` #34D399 as its ripple — the same colour, so the press drew
+ * nothing at all. See `rippleFor` in `src/theme/tokens.ts`.
+ */
+function rippleOf(skin: Skin): string {
+  return rippleFor(skin.content);
+}
 
 function skinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
   switch (variant) {
     case 'secondary':
-      return { background: 'transparent', content: colors.text, border: colors.text, ripple: colors.bgSoft };
+      return { background: 'transparent', content: colors.text, border: colors.text };
     case 'ghost':
       return {
         background: 'transparent',
         content: colors.textSecondary,
         border: null,
-        ripple: colors.bgSoft,
       };
     case 'danger':
       // The status *background* token is the readable foreground on the status fill.
-      return { background: colors.danger, content: colors.dangerBg, border: null, ripple: colors.dangerBg };
+      return { background: colors.danger, content: colors.dangerBg, border: null };
     case 'danger-outline':
       // `secondary`, but in the danger tone: for an irreversible action that is
       // only the ENTRY to a confirmation, so it must read as destructive at a
@@ -51,11 +62,10 @@ function skinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
         background: 'transparent',
         content: colors.danger,
         border: colors.danger,
-        ripple: colors.dangerBg,
       };
     case 'primary':
     default:
-      return { background: colors.cta, content: colors.onCta, border: null, ripple: colors.brand };
+      return { background: colors.cta, content: colors.onCta, border: null };
   }
 }
 
@@ -72,8 +82,17 @@ function skinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
  *
  * So a disabled button keeps its SHAPE (a filled variant stays filled, an
  * outlined one stays outlined, a ghost stays flat) and swaps its colours for
- * the muted pair: `textMuted` is verified >= 4.5:1 on every surface in BOTH
- * themes by `src/theme/contrast.test.ts`, including `bgSoft`.
+ * the DISABLED PAIR — `disabledBg`/`disabledFg`, tokens that exist for nothing
+ * else. They are not a dimmed CTA: `src/theme/contrast.test.ts` asserts the
+ * fill is >= 3:1 away from `cta` and the label >= 3:1 away from `onCta` in both
+ * themes, which is the thing a blanket alpha can never satisfy (an alpha moves
+ * both colours toward the page together, so the result is always a faded copy
+ * of the live button). The pair is also >= 3:1 against itself and >= 1.2:1
+ * against every surface, so the control neither shouts nor vanishes.
+ *
+ * An outlined variant stays outlined and un-filled; its edge is drawn in the
+ * same `disabledFg`, so the whole control — edge and label — is in the inert
+ * tone rather than in a washed-out version of the live one.
  *
  * Colour is still never the only signal: `accessibilityState.disabled` is set
  * and the press is dropped.
@@ -81,10 +100,9 @@ function skinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
 function disabledSkinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
   const enabled = skinFor(variant, colors);
   return {
-    background: enabled.background === 'transparent' ? 'transparent' : colors.bgSoft,
-    content: colors.textMuted,
-    border: enabled.border ? colors.borderSoft : null,
-    ripple: colors.bgSoft,
+    background: enabled.background === 'transparent' ? 'transparent' : colors.disabledBg,
+    content: colors.disabledFg,
+    border: enabled.border ? colors.disabledFg : null,
   };
 }
 
@@ -125,7 +143,7 @@ export function Button({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inert, busy: loading }}
       hitSlop={hitSlopFor(height, Platform.OS)}
-      android_ripple={inert ? undefined : { color: skin.ripple }}
+      android_ripple={inert ? undefined : { color: rippleOf(skin) }}
       // Layout NEVER goes in a style callback — see `PressableBase`.
       pressFeedback={inert ? 'none' : 'ds'}
       style={[

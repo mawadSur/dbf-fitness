@@ -114,6 +114,20 @@ export function ProgressRing({
     outputRange: [circumference, 0],
   });
 
+  /**
+   * At 0 the arc is not drawn AT ALL — the ring is just its track.
+   *
+   * Hiding it with `strokeDashoffset === circumference` is not enough. The arc
+   * carries `strokeLinecap="round"`, and a round cap on a dash whose visible
+   * length has collapsed to zero still paints its cap: react-native-svg's
+   * Android renderer drew a brand-coloured dot at 12 o'clock, and a renderer
+   * that rounds the offset up by a sub-pixel paints a short arc instead. Both
+   * say "you have started" on a screen whose whole message is "you have not"
+   * (the empty effort ring, day 0 of a streak). Not rendering the element is
+   * the only state that cannot be rounded into existence.
+   */
+  const hasArc = fraction > 0;
+
   return (
     <View
       testID={testID}
@@ -133,18 +147,20 @@ export function ProgressRing({
             strokeWidth={strokeWidth}
             fill="none"
           />
-          <AnimatedCircle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke={colors.progressArc}
-            strokeWidth={strokeWidth}
-            fill="none"
-            strokeLinecap="round"
-            strokeDasharray={`${circumference} ${circumference}`}
-            strokeDashoffset={strokeDashoffset}
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
+          {hasArc ? (
+            <AnimatedCircle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke={colors.progressArc}
+              strokeWidth={strokeWidth}
+              fill="none"
+              strokeLinecap="round"
+              strokeDasharray={`${circumference} ${circumference}`}
+              strokeDashoffset={strokeDashoffset}
+              transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            />
+          ) : null}
         </Svg>
         <View
           style={{

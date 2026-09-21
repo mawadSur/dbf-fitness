@@ -29,7 +29,7 @@ import {
   mockWindowDimensions,
   renderWithInsets,
 } from '../ui/testing';
-import { AppTabBar, DbfTabBar } from './TabBar';
+import { AppTabBar, DbfTabBar, tabAccessibilityProps } from './TabBar';
 
 /** `PHONE_METRICS` gesture bar — the inset the bar must pay exactly once. */
 const BOTTOM_INSET = 34;
@@ -456,5 +456,43 @@ describe('DbfTabBar', () => {
       expect(tab('community').props.accessibilityLabel).toBe('Community');
       expect(tabBarLabelFits(360, TABS.length, MAX_FONT_SCALE, 'Community')).toBe(true);
     });
+  });
+});
+
+describe('tabAccessibilityProps', () => {
+  /**
+   * A Playwright probe of the web build found every `[role="tab"]` reporting
+   * `aria-selected: null` — `accessibilityState={{ selected }}` alone did not
+   * reach the DOM, so a web screen reader was never told which tab the member
+   * is on. Colour, font weight and the brand pill say it visually and none of
+   * them reach assistive tech.
+   */
+  it('spells the selected state out for the web, keeping the native state too', () => {
+    const props = tabAccessibilityProps('web', { label: 'Community', focused: true });
+    expect(props.role).toBe('tab');
+    expect(props['aria-selected']).toBe(true);
+    expect(props['aria-label']).toBe('Community');
+    // Kept alongside: react-native-web ignores what it cannot map, and the
+    // native-flavoured assertions in this file still see it.
+    expect(props.accessibilityState).toEqual({ selected: true });
+    expect(props.accessibilityRole).toBe('tab');
+  });
+
+  it('says aria-selected false rather than omitting it on an inactive tab', () => {
+    // An absent attribute reads as "not a selectable tab"; `false` reads as
+    // "selectable, not selected", which is the whole point of a tablist.
+    expect(tabAccessibilityProps('web', { label: 'Food', focused: false })['aria-selected']).toBe(
+      false,
+    );
+  });
+
+  it.each(['ios', 'android'])('leaves %s on the native accessibility state alone', (os) => {
+    const props = tabAccessibilityProps(os, { label: 'Home', focused: true });
+    expect(props).toEqual({
+      accessibilityRole: 'tab',
+      accessibilityState: { selected: true },
+      accessibilityLabel: 'Home',
+    });
+    expect(props['aria-selected']).toBeUndefined();
   });
 });

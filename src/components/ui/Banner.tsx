@@ -1,7 +1,7 @@
 import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useOptionalTheme } from '../../theme/ThemeProvider';
-import type { ThemeColors } from '../../theme/tokens';
+import { rippleFor, type ThemeColors } from '../../theme/tokens';
 import { Icon } from './Icon';
 import type { IconName } from './icons';
 import { hitSlopFor } from './layout';
@@ -90,7 +90,7 @@ export function Banner({
           accessibilityRole="button"
           accessibilityLabel={dismissAccessibilityLabel}
           hitSlop={hitSlopFor(24, Platform.OS)}
-          android_ripple={{ color: colors.bgSoft, borderless: true }}
+          android_ripple={{ color: rippleFor(colors.text), borderless: true }}
           // Layout NEVER goes in a style callback — see `PressableBase`.
           style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}
         >

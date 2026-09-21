@@ -12,7 +12,12 @@ export { Banner, BANNER_TONES, type BannerProps, type BannerTone } from './Banne
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export { Card, type CardProps } from './Card';
 export { ChecklistRow, CHECK_TARGET_SIZE, type ChecklistRowProps } from './ChecklistRow';
-export { Chip, type ChipProps } from './Chip';
+export {
+  Chip,
+  chipAccessibilityProps,
+  type ChipProps,
+  type ChipSelectionRole,
+} from './Chip';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
 export { FixedFooter, type FixedFooterProps } from './FixedFooter';
 export {

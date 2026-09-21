@@ -90,12 +90,39 @@ describe('ProgressRing', () => {
     expect(svg?.props?.importantForAccessibility).toBe('no-hide-descendants');
   });
 
-  it('draws nothing and never divides by zero when max is zero', async () => {
-    await renderInTheme(
-      <ProgressRing value={5} max={0} label="Empty" animate={false} testID="ring" />,
-    );
-    expect(ring().props.accessibilityValue.now).toBe(0);
-    expect(arcOffset()).toBeCloseTo(circumference(), 1);
+  /**
+   * At 0 the ring must be JUST ITS TRACK — no arc element at all.
+   *
+   * `strokeDashoffset === circumference` is not enough: the arc has
+   * `strokeLinecap="round"`, and a round cap on a dash whose visible length has
+   * collapsed to zero still paints its cap (react-native-svg's Android
+   * renderer drew a brand dot at 12 o'clock). "You have not started" must not
+   * render as "you have just started", so the element is not rendered.
+   */
+  describe('a value of 0 draws only the track', () => {
+    it.each([
+      ['a real zero', 0, 10],
+      ['max of zero', 5, 0],
+      ['a negative value', -3, 10],
+    ])('renders one circle for %s', async (_case, value, max) => {
+      await renderInTheme(
+        <ProgressRing value={value} max={max} label="Empty" animate={false} testID="ring" />,
+      );
+      expect(ring().props.accessibilityValue.now).toBe(0);
+      expect(circles()).toHaveLength(1);
+      // The only stroke on screen is the track.
+      expect(svgStrokes(ring())).toEqual([lightTheme.progressTrack.toUpperCase()]);
+      // No second circle means no round cap that a renderer could paint as a dot.
+      expect(circles()[0]?.props?.strokeLinecap).toBeUndefined();
+    });
+
+    it('brings the arc back as soon as there is progress', async () => {
+      await renderInTheme(
+        <ProgressRing value={1} max={10} label="Started" animate={false} testID="ring" />,
+      );
+      expect(circles()).toHaveLength(2);
+      expect(arcOffset()).toBeLessThan(circumference());
+    });
   });
 
   it('scales the ring geometry with the size and strokeWidth props', async () => {

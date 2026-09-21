@@ -71,25 +71,54 @@ describe('Button', () => {
         await renderInTheme(<Button label="Upload recording" disabled testID="b" />, scheme);
         const colors = colorsFor(scheme);
         const style = pressableStyle(screen.getByTestId('b'));
-        // A filled variant keeps a fill — just the muted one, not a ghost of the CTA.
-        expect(style.backgroundColor).toBe(colors.bgSoft);
+        // A filled variant keeps a fill — the DISABLED one, not a ghost of the CTA.
+        expect(style.backgroundColor).toBe(colors.disabledBg);
         const label = screen.getByText('Upload recording');
-        expect(flattenStyle(label.props.style).color).toBe(colors.textMuted);
-        expect(contrastRatio(colors.textMuted, colors.bgSoft)).toBeGreaterThanOrEqual(
+        expect(flattenStyle(label.props.style).color).toBe(colors.disabledFg);
+        expect(contrastRatio(colors.disabledFg, colors.disabledBg)).toBeGreaterThanOrEqual(
           TEXT_CONTRAST_MIN,
         );
       },
     );
+
+    /**
+     * The other half of the same defect: `opacity: 0.45` left a disabled
+     * primary looking like a live CTA (a 45%-faded #34D399 in dark is still
+     * unmistakably the brand green). A disabled button must not be mistakable
+     * for the enabled one at a glance, so the FILL has to move, not just fade.
+     */
+    it.each(BOTH_THEMES)('does not look like a live CTA in %s', async (scheme) => {
+      const colors = colorsFor(scheme);
+      // Both buttons in ONE tree: the comparison is between what a member sees
+      // side by side, and it keeps a single render/cleanup cycle.
+      await renderInTheme(
+        <View>
+          <Button label="Sign in" disabled testID="off" />
+          <Button label="Create account" onPress={() => undefined} testID="on" />
+        </View>,
+        scheme,
+      );
+      const offFill = pressableStyle(screen.getByTestId('off')).backgroundColor;
+      const onFill = pressableStyle(screen.getByTestId('on')).backgroundColor;
+
+      expect(onFill).toBe(colors.cta);
+      expect(offFill).not.toBe(onFill);
+      // Same threshold as any other essential UI difference (SC 1.4.11).
+      expect(contrastRatio(offFill as string, onFill as string)).toBeGreaterThanOrEqual(3);
+    });
 
     it.each(BOTH_THEMES)('keeps an outlined variant outlined in %s', async (scheme) => {
       await renderInTheme(
         <Button label="Cancel" variant="secondary" disabled testID="b" />,
         scheme,
       );
+      const colors = colorsFor(scheme);
       const style = pressableStyle(screen.getByTestId('b'));
       expect(style.backgroundColor).toBe('transparent');
       expect(style.borderWidth).toBe(2);
-      expect(style.borderColor).toBe(colorsFor(scheme).borderSoft);
+      expect(style.borderColor).toBe(colors.disabledFg);
+      // The edge is the control's only shape here, so it has to be visible.
+      expect(contrastRatio(colors.disabledFg, colors.bg)).toBeGreaterThanOrEqual(3);
     });
 
     it('keeps its own colours while LOADING, so the spinner stays visible', async () => {

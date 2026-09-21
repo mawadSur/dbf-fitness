@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { rippleFor } from '../../theme/tokens';
 import { Icon } from './Icon';
 import { hitSlopFor, minTouchTarget } from './layout';
 import { PressableBase } from './PressableBase';
@@ -72,7 +73,18 @@ export function Input({
   const [revealed, setRevealed] = useState(false);
 
   const invalid = !!error;
-  const borderColor = invalid ? colors.danger : focused ? colors.focus : colors.borderStrong;
+  // A disabled field takes the disabled pair rather than `opacity: 0.45` over
+  // the live skin, for the same reason `Button` and `Chip` do: the alpha faded
+  // the border, the value and the placeholder together, so in dark mode a
+  // disabled field was a barely-visible smudge and you could not read the value
+  // it was showing you. See `src/theme/tokens.ts`.
+  const borderColor = disabled
+    ? colors.disabledFg
+    : invalid
+      ? colors.danger
+      : focused
+        ? colors.focus
+        : colors.borderStrong;
   const target = minTouchTarget(Platform.OS);
 
   return (
@@ -89,9 +101,8 @@ export function Input({
           borderRadius: tokens.radii.md,
           borderWidth: focused || invalid ? 2 : 1,
           borderColor,
-          backgroundColor: colors.surface,
+          backgroundColor: disabled ? colors.disabledBg : colors.surface,
           paddingHorizontal: tokens.space.md,
-          opacity: disabled ? 0.45 : 1,
         }}
       >
         <TextInput
@@ -99,7 +110,7 @@ export function Input({
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={disabled ? colors.disabledFg : colors.textMuted}
           editable={!disabled}
           secureTextEntry={secureTextEntry && !revealed}
           keyboardType={keyboardType}
@@ -120,7 +131,7 @@ export function Input({
             paddingVertical: multiline ? 12 : 8,
             minHeight: multiline ? 96 : undefined,
             textAlignVertical: multiline ? 'top' : 'center',
-            color: colors.text,
+            color: disabled ? colors.disabledFg : colors.text,
             ...tokens.typeScale.body,
           }}
         />
@@ -134,7 +145,7 @@ export function Input({
             accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
             accessibilityState={{ selected: revealed, disabled }}
             hitSlop={hitSlopFor(target, Platform.OS) + 4}
-            android_ripple={{ color: colors.bgSoft, borderless: true }}
+            android_ripple={{ color: rippleFor(colors.text), borderless: true }}
             // Layout NEVER goes in a style callback — see `PressableBase`.
             style={{ width: target, height: target, alignItems: 'center', justifyContent: 'center' }}
           >

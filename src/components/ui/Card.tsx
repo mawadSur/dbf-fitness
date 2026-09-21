@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { rippleFor } from '../../theme/tokens';
 import { PressableBase } from './PressableBase';
 
 export type CardProps = {
@@ -58,7 +59,7 @@ export function Card({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      android_ripple={{ color: colors.bgSoft }}
+      android_ripple={{ color: rippleFor(colors.text) }}
       // Layout NEVER goes in a style callback — see `PressableBase`.
       style={[base, { minHeight: Platform.OS === 'android' ? 48 : 44 }, style]}
     >

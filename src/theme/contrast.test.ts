@@ -34,7 +34,22 @@ const PAIRS: Pair[] = [
   // The arc/track pair is the ONLY thing that says how far along a ring is, so
   // it is an essential UI graphic (SC 1.4.11), not decoration.
   { fg: 'progressArc', bg: 'progressTrack', role: 'ui', why: 'progress ring arc against its track' },
+  // Same rule for the LINEAR track: the filled part still has to be the thing
+  // that says how far along you are.
+  {
+    fg: 'progressArc',
+    bg: 'progressTrackLinear',
+    role: 'ui',
+    why: 'linear progress fill against its track',
+  },
   ...onEverySurface('progressArc', 'ui', 'progress ring arc against the page'),
+  // A disabled label is INERT, so SC 1.4.3 does not apply to it — but it still
+  // has to be readable enough to tell you what the button would do, which is
+  // why it is asserted as a `ui` pair (>= 3:1) rather than dropped.
+  { fg: 'disabledFg', bg: 'disabledBg', role: 'ui', why: 'disabled control label on its fill' },
+  // An OUTLINED disabled control keeps no fill, so its label and its edge sit
+  // straight on the page.
+  ...onEverySurface('disabledFg', 'ui', 'disabled outline label / edge on the page'),
   { fg: 'onCta', bg: 'cta', role: 'text', why: 'primary button label' },
   { fg: 'success', bg: 'successBg', role: 'text', why: 'success banner text' },
   { fg: 'success', bg: 'bg', role: 'text', why: 'success text inline on the page' },
@@ -66,6 +81,12 @@ const DECORATIVE_PAIRS: Pair[] = [
   // The track only has to be VISIBLE against the page; what has to be readable
   // is the arc against the track, which is asserted as a `ui` pair above.
   ...onEverySurface('progressTrack', 'decorative', 'progress track against the page'),
+  // The linear track must READ AS EMPTY: visible, but nowhere near the arc's
+  // weight. (The light ring track, #6EE7B7, is 1.6:1 on white and at 6-8px
+  // looked like a finished bar — that is the bug this token exists for.)
+  ...onEverySurface('progressTrackLinear', 'decorative', 'linear progress track against the page'),
+  // A disabled control must not vanish into whatever surface it sits on.
+  ...onEverySurface('disabledBg', 'decorative', 'disabled control fill against the page'),
 ];
 
 /** A card must be findable: either its fill differs from the page, or its hairline shows. */
@@ -118,6 +139,38 @@ describe.each<[ThemeName, ThemeColors]>([
     // Light cards are white on white and rely on the hairline plus shadow-sm;
     // dark cards are tonal, so either signal on its own is enough.
     expect(Math.max(fillDelta, hairline)).toBeGreaterThanOrEqual(1.2);
+  });
+
+  /**
+   * The bug this guards: disabled used to be `opacity: 0.45` over the enabled
+   * skin, so in dark mode the bright CTA (#34D399) and its near-black label
+   * both collapsed toward the page and met in the middle — a disabled
+   * "Sign in" measured 1.48:1 and still looked like a live CTA. A blanket
+   * alpha can never satisfy this: it moves BOTH colours toward the page by the
+   * same amount, so the disabled fill is always a dimmed copy of the enabled
+   * one. Distinct tokens can, and this is the assertion that keeps them.
+   */
+  it('makes a disabled control unmistakably different from an enabled one', () => {
+    const fromCta = contrastRatio(theme.disabledBg, theme.cta);
+    const labelFromOnCta = contrastRatio(theme.disabledFg, theme.onCta);
+    report.push(
+      `${themeName.padEnd(5)} ${roundRatio(fromCta).toFixed(2).padStart(6)} disabledBg vs cta / ` +
+        `${roundRatio(labelFromOnCta).toFixed(2)} disabledFg vs onCta — disabled affordance`,
+    );
+    // Same threshold as any other essential UI difference (SC 1.4.11).
+    expect(roundRatio(fromCta)).toBeGreaterThanOrEqual(3);
+    expect(roundRatio(labelFromOnCta)).toBeGreaterThanOrEqual(3);
+    // And it is a real fill, not an alpha: nothing about it is derived from cta.
+    expect(theme.disabledBg).not.toBe(theme.cta);
+    expect(theme.disabledFg).not.toBe(theme.onCta);
+  });
+
+  it('keeps the linear progress track paler than the ring track', () => {
+    // Not a contrast rule — a weight rule. The linear track sits closer to the
+    // page than the ring track does, which is the whole point of the split.
+    const linearFromPage = contrastRatio(theme.progressTrackLinear, theme.bg);
+    const ringFromPage = contrastRatio(theme.progressTrack, theme.bg);
+    expect(linearFromPage).toBeLessThanOrEqual(ringFromPage);
   });
 
   it('defines every token as a hex colour', () => {

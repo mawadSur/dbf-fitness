@@ -1,9 +1,22 @@
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { Pressable, StyleSheet, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useOptionalTheme, useReducedMotion } from '../../theme/ThemeProvider';
-import { fontFamily, tabBarBackground, themes, type ThemeName } from '../../theme/tokens';
+import {
+  fontFamily,
+  rippleFor,
+  tabBarBackground,
+  themes,
+  type ThemeName,
+} from '../../theme/tokens';
 import { Text } from '../ui/Typography';
 import {
   TAB_BAR_GAP,
@@ -39,6 +52,43 @@ import {
  * which is opacity and transform, never layout — is computed per press.
  */
 const TAB_ITEM: ViewStyle = { flex: 1 };
+
+/**
+ * What a tab hands the platform so its SELECTED state is announced.
+ *
+ * `accessibilityState={{ selected }}` alone is enough on iOS and Android, and
+ * it is what react-native-web is supposed to map to `aria-selected`. It does
+ * not arrive: every `[role="tab"]` in the rendered bar came back with
+ * `aria-selected: null` in a Playwright probe of the web build, so a screen
+ * reader on the web is told there are five tabs and never which one the member
+ * is on — colour, weight and the brand pill are all it has, and none of those
+ * reach assistive tech. (The same gap is why `Chip` spells its state out; see
+ * `chipAccessibilityProps`.)
+ *
+ * So on web the ARIA attributes are passed EXPLICITLY, and the native
+ * `accessibilityState` is kept alongside them: react-native-web ignores props
+ * it cannot map, and RNTL's native-flavoured queries still see the state.
+ */
+export function tabAccessibilityProps(
+  os: string,
+  { label, focused }: { label: string; focused: boolean },
+): Record<string, unknown> {
+  if (os === 'web') {
+    return {
+      role: 'tab',
+      'aria-selected': focused,
+      'aria-label': label,
+      accessibilityRole: 'tab' as const,
+      accessibilityState: { selected: focused },
+      accessibilityLabel: label,
+    };
+  }
+  return {
+    accessibilityRole: 'tab' as const,
+    accessibilityState: { selected: focused },
+    accessibilityLabel: label,
+  };
+}
 
 const TAB_ITEM_CONTENT: ViewStyle = {
   flex: 1,
@@ -146,10 +196,11 @@ export function DbfTabBar({
             testID={`tab-${route.name}`}
             onPress={onPress}
             onLongPress={onLongPress}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: focused }}
-            accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
-            android_ripple={{ color: colors.bgSoft, borderless: true }}
+            {...tabAccessibilityProps(Platform.OS, {
+              label: options.tabBarAccessibilityLabel ?? label,
+              focused,
+            })}
+            android_ripple={{ color: rippleFor(colors.text), borderless: true }}
             style={TAB_ITEM}
           >
             {({ pressed }) => (
