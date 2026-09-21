@@ -294,9 +294,14 @@ auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
+# Enabled for admin step-up: the admin RPCs (admin_mark_paid,
+# admin_cancel_subscription, admin_list_subscriptions, admin_list_reports,
+# review_report, remove_from_group) demand an aal2 JWT from any admin who has a
+# VERIFIED TOTP factor. Admins without one still pass (see
+# public.admin_mfa_required() in 20260921130000_admin_payments.sql).
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]
