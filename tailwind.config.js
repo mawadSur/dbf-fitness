@@ -34,7 +34,13 @@ module.exports = {
         cta: token('cta'),
         'on-cta': token('on-cta'),
         sage: token('sage'),
-        progress: { arc: token('progress-arc'), track: token('progress-track') },
+        progress: {
+          arc: token('progress-arc'),
+          track: token('progress-track'),
+          // `bg-progress-track-linear` — linear bars only; the ring keeps `track`.
+          'track-linear': token('progress-track-linear'),
+        },
+        disabled: { DEFAULT: token('disabled-bg'), fg: token('disabled-fg') },
         border: { soft: token('border-soft'), strong: token('border-strong') },
         focus: token('focus'),
         success: { DEFAULT: token('success'), bg: token('success-bg') },

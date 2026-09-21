@@ -72,8 +72,17 @@ function skinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
  *
  * So a disabled button keeps its SHAPE (a filled variant stays filled, an
  * outlined one stays outlined, a ghost stays flat) and swaps its colours for
- * the muted pair: `textMuted` is verified >= 4.5:1 on every surface in BOTH
- * themes by `src/theme/contrast.test.ts`, including `bgSoft`.
+ * the DISABLED PAIR — `disabledBg`/`disabledFg`, tokens that exist for nothing
+ * else. They are not a dimmed CTA: `src/theme/contrast.test.ts` asserts the
+ * fill is >= 3:1 away from `cta` and the label >= 3:1 away from `onCta` in both
+ * themes, which is the thing a blanket alpha can never satisfy (an alpha moves
+ * both colours toward the page together, so the result is always a faded copy
+ * of the live button). The pair is also >= 3:1 against itself and >= 1.2:1
+ * against every surface, so the control neither shouts nor vanishes.
+ *
+ * An outlined variant stays outlined and un-filled; its edge is drawn in the
+ * same `disabledFg`, so the whole control — edge and label — is in the inert
+ * tone rather than in a washed-out version of the live one.
  *
  * Colour is still never the only signal: `accessibilityState.disabled` is set
  * and the press is dropped.
@@ -81,10 +90,10 @@ function skinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
 function disabledSkinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
   const enabled = skinFor(variant, colors);
   return {
-    background: enabled.background === 'transparent' ? 'transparent' : colors.bgSoft,
-    content: colors.textMuted,
-    border: enabled.border ? colors.borderSoft : null,
-    ripple: colors.bgSoft,
+    background: enabled.background === 'transparent' ? 'transparent' : colors.disabledBg,
+    content: colors.disabledFg,
+    border: enabled.border ? colors.disabledFg : null,
+    ripple: colors.disabledBg,
   };
 }
 
