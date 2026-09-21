@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react-native';
-import * as RN from 'react-native';
 import { PixelRatio, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ScreenShellContext } from '../ui';
+import { mockWindowDimensions } from '../ui/testing';
 import { CallControlsBar } from './CallControlsBar';
 
 const FRAME = { x: 0, y: 0, width: 390, height: 844 };
@@ -27,7 +27,21 @@ async function renderBar(props: Partial<Parameters<typeof CallControlsBar>[0]> =
   );
 }
 
+/** True when `node` sits anywhere under the single control row. */
+function inRow(node: unknown, row: unknown): boolean {
+  let current = (node as { parent?: unknown }).parent as { parent?: unknown } | undefined;
+  while (current) {
+    if (current === row) return true;
+    current = current.parent as { parent?: unknown } | undefined;
+  }
+  return false;
+}
+
 describe('CallControlsBar', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('offers all three controls with labels, not icons alone', async () => {
     await renderBar();
     expect(screen.getByText('Mute')).toBeTruthy();
@@ -48,76 +62,64 @@ describe('CallControlsBar', () => {
     expect(screen.getByTestId('icon-camera-off', { includeHiddenElements: true })).toBeTruthy();
   });
 
-  it('every control clears the 44pt minimum', async () => {
+  it('every control clears the 48dp Android minimum', async () => {
     await renderBar();
     for (const label of ['Mute my microphone', 'Turn my camera off', 'Leave the class']) {
       const box = StyleSheet.flatten(screen.getByLabelText(label).props.style) as {
         minHeight?: number;
       };
-      expect(box.minHeight ?? 0).toBeGreaterThanOrEqual(44);
+      expect(box.minHeight ?? 0).toBeGreaterThanOrEqual(48);
     }
   });
 
-  it('pairs the two toggles in a row at normal text size', async () => {
+  it('puts all three controls on ONE row at normal text, so the video stage stays above the fold', async () => {
     const scale = jest.spyOn(PixelRatio, 'getFontScale').mockReturnValue(1);
     try {
       await renderBar();
-      const row = StyleSheet.flatten(screen.getByTestId('call-controls-row').props.style) as {
-        flexDirection?: string;
-      };
-      expect(row.flexDirection).toBe('row');
+      const row = screen.getByTestId('call-controls-row');
+      expect(
+        (StyleSheet.flatten(row.props.style) as { flexDirection?: string }).flexDirection,
+      ).toBe('row');
+      expect(inRow(screen.getByLabelText('Mute my microphone'), row)).toBe(true);
+      expect(inRow(screen.getByLabelText('Turn my camera off'), row)).toBe(true);
+      expect(inRow(screen.getByLabelText('Leave the class'), row)).toBe(true);
     } finally {
       scale.mockRestore();
     }
   });
 
-  it('keeps Leave out of the toggle row and full width, so no label has to wrap', async () => {
-    // Three labelled controls abreast wrapped "Camera off" mid-word on a 390pt
-    // phone; Leave owns the row below, where the destructive action is also
-    // harder to hit by accident.
-    await renderBar();
-    const leave = screen.getByTestId('call-controls-leave');
-    expect(leave).toBeTruthy();
-    const row = screen.getByTestId('call-controls-row');
-    const inRow = (node: unknown): boolean => {
-      let current = (node as { parent?: unknown }).parent as { parent?: unknown } | undefined;
-      while (current) {
-        if (current === row) return true;
-        current = current.parent as { parent?: unknown } | undefined;
-      }
-      return false;
-    };
-    expect(inRow(leave)).toBe(false);
-    expect(inRow(screen.getByLabelText('Mute my microphone'))).toBe(true);
-    expect(inRow(screen.getByLabelText('Turn my camera off'))).toBe(true);
-  });
-
-  it('stacks the toggles on a 360pt phone, where "Camera off" would wrap mid-word', async () => {
-    const dims = jest
-      .spyOn(RN, 'useWindowDimensions')
-      .mockReturnValue({ width: 360, height: 640, scale: 2, fontScale: 1 });
+  it('keeps one row on a 360pt phone — the size that used to need three', async () => {
+    mockWindowDimensions({ width: 360, height: 640 });
+    const scale = jest.spyOn(PixelRatio, 'getFontScale').mockReturnValue(1);
     try {
       await renderBar();
-      const row = StyleSheet.flatten(screen.getByTestId('call-controls-row').props.style) as {
-        flexDirection?: string;
-      };
-      expect(row.flexDirection).toBe('column');
+      const row = screen.getByTestId('call-controls-row');
+      expect(
+        (StyleSheet.flatten(row.props.style) as { flexDirection?: string }).flexDirection,
+      ).toBe('row');
+      expect(inRow(screen.getByLabelText('Leave the class'), row)).toBe(true);
     } finally {
-      dims.mockRestore();
+      scale.mockRestore();
     }
   });
 
-  it('stacks the toggles at 130% text so they cannot squash on a 360pt row', async () => {
-    const scale = jest.spyOn(PixelRatio, 'getFontScale').mockReturnValue(1.3);
+  it('drops Leave to a second row at 200% text, and never past two rows', async () => {
+    mockWindowDimensions({ width: 360, height: 640, fontScale: 2 });
+    const font = jest.spyOn(PixelRatio, 'getFontScale').mockReturnValue(2);
     try {
       await renderBar();
-      const row = StyleSheet.flatten(screen.getByTestId('call-controls-row').props.style) as {
-        flexDirection?: string;
-      };
-      expect(row.flexDirection).toBe('column');
-      expect(screen.getByText('Leave')).toBeTruthy();
+      const row = screen.getByTestId('call-controls-row');
+      // The two toggles still share a row: only Leave moves down.
+      expect(
+        (StyleSheet.flatten(row.props.style) as { flexDirection?: string }).flexDirection,
+      ).toBe('row');
+      expect(inRow(screen.getByLabelText('Mute my microphone'), row)).toBe(true);
+      expect(inRow(screen.getByLabelText('Turn my camera off'), row)).toBe(true);
+      expect(inRow(screen.getByLabelText('Leave the class'), row)).toBe(false);
+      // And the label is allowed to wrap rather than be clipped.
+      expect(screen.getByText('Camera off').props.numberOfLines).toBe(2);
     } finally {
-      scale.mockRestore();
+      font.mockRestore();
     }
   });
 

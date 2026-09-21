@@ -3,11 +3,11 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View } from 'react-native';
 
 import { ExercisePictogram } from '../../../../src/components/exercises';
+import { formatPrescription } from '../../../../src/features/exercises';
 import { friendlyErrorMessage } from '../../../../src/components/friendlyError';
 import { Card, Chip, Heading, ScreenHeader, ScreenShell, Skeleton, Text } from '../../../../src/components/ui';
 import { RetryState } from '../../../../src/components/workout/ListStates';
 import { fetchExercise } from '../../../../src/features/workouts/queries';
-import { repsOrDurationIcon } from '../../../../src/features/workouts/repsOrDuration';
 import { useDelayedVisible } from '../../../../src/components/ui/useDelayedVisible';
 
 export default function ExerciseDetailScreen() {
@@ -22,6 +22,11 @@ export default function ExerciseDetailScreen() {
 
   const showSkeleton = useDelayedVisible(isLoading);
   const back = () => router.back();
+  // Built from whatever shape the row arrived in; see the chip below.
+  const prescription = formatPrescription({
+    repsOrDuration: data?.repsOrDuration ?? null,
+    ...(data as Record<string, unknown> | undefined),
+  });
 
   if (isLoading) {
     return (
@@ -87,11 +92,27 @@ export default function ExerciseDetailScreen() {
           testID="exercise-hero"
         />
 
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {/* The icon is read off the value: a clock for durations, the barbell for
-              rep counts. One chip renders both, so a fixed clock mislabelled half
-              the data ("12 reps" behind a clock glyph). */}
-          <Chip label={data.repsOrDuration} icon={repsOrDurationIcon(data.repsOrDuration)} />
+        <View style={{ gap: 4 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {/* The icon is read off the MEANING of the prescription: a clock only for
+                time, the barbell for rep counts, an arrow for distance. One chip renders
+                all of them, so a fixed clock mislabelled half the data ("12 reps" behind
+                a clock glyph).
+
+                `formatPrescription` takes either shape — the structured columns
+                (`prescription_mode`, `sets`, `reps_min`/`reps_max`, `seconds`, …) when the
+                row has them, and the legacy free-text `reps_or_duration` when it does not —
+                so this screen is already correct for rows written before and after that
+                migration. `fetchExercise` does not select the structured columns yet
+                (`src/features/workouts/queries.ts` belongs to another stream); the moment
+                it does, they flow straight through. */}
+            <Chip label={prescription.text} icon={prescription.icon} testID="exercise-prescription" />
+          </View>
+          {prescription.detail ? (
+            <Text role="bodySm" tone="muted" testID="exercise-prescription-detail">
+              {prescription.detail}
+            </Text>
+          ) : null}
         </View>
 
         <Card padding={16}>

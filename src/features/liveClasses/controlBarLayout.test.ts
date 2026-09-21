@@ -1,35 +1,58 @@
-import { shouldStackControls, STACK_FONT_SCALE, toggleWidthNeeded } from './controlBarLayout';
+import {
+  CONTROL_GAP,
+  controlBarRows,
+  controlWidthNeeded,
+  shouldStackControls,
+  STACK_FONT_SCALE,
+} from './controlBarLayout';
 
 /** Footer inner width = screen width minus the 16pt gutter on each side. */
 const inner = (screenWidth: number) => screenWidth - 32;
 
-describe('shouldStackControls', () => {
-  it('keeps the two toggles in a row on a 390pt and a 412pt phone', () => {
-    expect(shouldStackControls(1, inner(390))).toBe(false);
-    expect(shouldStackControls(1, inner(412))).toBe(false);
-    expect(shouldStackControls(1, inner(1280))).toBe(false);
+describe('controlBarRows', () => {
+  it('fits all three controls on ONE row from 360pt up', () => {
+    // The regression this file exists for: the old labelled-Button bar took two
+    // rows at 390pt and three at 360pt, pushing the video stage below the fold.
+    expect(controlBarRows(1, inner(360))).toBe(1);
+    expect(controlBarRows(1, inner(390))).toBe(1);
+    expect(controlBarRows(1, inner(412))).toBe(1);
+    expect(controlBarRows(1, inner(1280))).toBe(1);
   });
 
-  it('stacks on a 360pt phone, where "Camera off" cannot share the row', () => {
-    // The measured advance is what proves this, not a guessed breakpoint.
-    expect(toggleWidthNeeded(1) * 2 + 8).toBeGreaterThan(inner(360));
-    expect(shouldStackControls(1, inner(360))).toBe(true);
+  it('measures the fit from the shipped glyph advances, not a guessed breakpoint', () => {
+    const three = controlWidthNeeded(1) * 3 + CONTROL_GAP * 2;
+    expect(three).toBeLessThanOrEqual(inner(360));
   });
 
-  it('keeps three controls in a row at default and mildly enlarged text', () => {
-    expect(shouldStackControls(1)).toBe(false);
-    expect(shouldStackControls(1.15)).toBe(false);
-    expect(shouldStackControls(STACK_FONT_SCALE - 0.01)).toBe(false);
+  it('still fits one row at 130% text on a 360pt phone', () => {
+    expect(controlBarRows(STACK_FONT_SCALE, inner(360))).toBe(1);
+    expect(shouldStackControls(STACK_FONT_SCALE, inner(360))).toBe(false);
   });
 
-  it('stacks from 130% upwards, including the 200% ceiling', () => {
-    expect(shouldStackControls(STACK_FONT_SCALE)).toBe(true);
-    expect(shouldStackControls(1.5)).toBe(true);
-    expect(shouldStackControls(2)).toBe(true);
+  it('never needs more than TWO rows at 360pt, even at the 200% ceiling', () => {
+    expect(controlBarRows(2, inner(360))).toBe(2);
+    expect(controlBarRows(2, inner(390))).toBeLessThanOrEqual(2);
+    // 200% on a wide phone still keeps Leave beside the toggles is not required,
+    // but it must never fall back to one control per row.
+    expect(controlBarRows(2, inner(412))).toBeLessThanOrEqual(2);
   });
 
-  it('treats a missing or nonsense scale as the default row', () => {
-    expect(shouldStackControls(Number.NaN)).toBe(false);
-    expect(shouldStackControls(Number.POSITIVE_INFINITY)).toBe(false);
+  it('drops Leave below the toggles rather than stacking everything', () => {
+    expect(controlBarRows(2, inner(360))).toBe(2);
+  });
+
+  it('assumes a 360pt phone when the width cannot be measured', () => {
+    expect(controlBarRows(1)).toBe(1);
+    expect(controlBarRows(2)).toBe(2);
+  });
+
+  it('treats a nonsense scale as the default row', () => {
+    expect(controlBarRows(Number.NaN, inner(360))).toBe(1);
+    expect(controlBarRows(Number.POSITIVE_INFINITY, inner(360))).toBe(1);
+    expect(controlBarRows(0, inner(360))).toBe(1);
+  });
+
+  it('charges more width as text grows', () => {
+    expect(controlWidthNeeded(2)).toBeGreaterThan(controlWidthNeeded(1));
   });
 });

@@ -15,7 +15,6 @@ import { LiveStage } from '../../../../src/components/live/LiveStage';
 import { SubscriptionBlockedPanel } from '../../../../src/components/live/SubscriptionBlockedPanel';
 import {
   Badge,
-  Banner,
   Card,
   CONTENT_MAX_WIDTH,
   EmptyState,
@@ -213,25 +212,36 @@ export default function LiveClassScreen() {
         ) : undefined
       }
     >
-      <Card testID="class-summary" style={{ gap: 8 }}>
-        <Badge label={STATUS_BADGE_LABEL[state]} tone={badge.tone} icon={badge.icon} />
-        <Text role="bodySm" tone="secondary">
-          {formatStartTime(liveClass.starts_at)}
-        </Text>
-        <Text role="label">{formatCountdown(liveClass.starts_at, now)}</Text>
-      </Card>
+      {/*
+        The schedule card is pre-call information: once the member is in the
+        room the header already names the class, and on a 360x640 phone those
+        130pt (plus the gap) were the difference between seeing the video stage
+        and having to scroll for it. In call the badge moves into a single
+        compact line so the status is still stated in words, not by colour.
+      */}
+      {inCall ? (
+        <View
+          testID="class-summary-compact"
+          style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}
+        >
+          <Badge label={STATUS_BADGE_LABEL[state]} tone={badge.tone} icon={badge.icon} />
+          <Text role="bodySm" tone="secondary">
+            {formatStartTime(liveClass.starts_at)}
+          </Text>
+        </View>
+      ) : (
+        <Card testID="class-summary" style={{ gap: 8 }}>
+          <Badge label={STATUS_BADGE_LABEL[state]} tone={badge.tone} icon={badge.icon} />
+          <Text role="bodySm" tone="secondary">
+            {formatStartTime(liveClass.starts_at)}
+          </Text>
+          <Text role="label">{formatCountdown(liveClass.starts_at, now)}</Text>
+        </Card>
+      )}
 
       {inCall ? (
         <View style={{ gap: 16 }}>
           {graceInfo ? <GraceBanner info={graceInfo} /> : null}
-          {session.mode === 'mock' ? (
-            <Banner
-              tone="info"
-              title="Preview mode"
-              message="Live video isn’t switched on yet, so you are seeing a local preview. Nothing is broadcast."
-              testID="preview-mode"
-            />
-          ) : null}
 
           <LiveStage
             participants={session.tiles}

@@ -143,6 +143,47 @@ export const CATEGORY_KEYWORDS: Record<PictogramCategory, readonly string[]> = {
 /** Spec order: the tie-break when two categories match keywords of equal length. */
 const CATEGORY_ORDER: readonly PictogramCategory[] = ['cardio', 'strength', 'core', 'mobility'];
 
+/* ------------------------------------------------------------- gerunds ---- */
+
+/**
+ * Every word the alias table and the keyword table are built from.
+ *
+ * De-gerunding English by rule alone is guesswork ("lunging" -> "lung" or
+ * "lunge"? "running" -> "runn", "rune" or "run"?). It does not have to be:
+ * the only stems that matter are the ones this module can actually match, so a
+ * candidate is accepted when it is a word the tables already know, and only
+ * the plain drop-the-suffix form is used otherwise.
+ */
+const KNOWN_WORDS: ReadonlySet<string> = new Set([
+  ...Object.keys(NAME_ALIASES).flatMap((phrase) => phrase.split(' ')),
+  ...Object.values(CATEGORY_KEYWORDS).flatMap((keywords) =>
+    keywords.flatMap((keyword) => keyword.split(' ')),
+  ),
+]);
+
+/**
+ * Candidate stems for an "-ing" word, in the order English forms them:
+ * plain (climbing -> climb), silent-e restored (lunging -> lunge), and
+ * doubled-consonant undone (running -> run, skipping -> skip).
+ *
+ * Words shorter than six letters are left alone: "ring", "swing" and "thing"
+ * are not gerunds of anything this app draws.
+ */
+export function gerundStems(word: string): string[] {
+  if (!/[a-z]ing$/.test(word) || word.length < 6) return [];
+  const base = word.slice(0, -3);
+  const stems = [base, `${base}e`];
+  if (/([bcdfgklmnprstvz])\1$/.test(base)) stems.push(base.slice(0, -1));
+  return stems;
+}
+
+/** The stem of an "-ing" word, preferring one the tables recognise. */
+export function deGerund(word: string): string {
+  const stems = gerundStems(word);
+  if (stems.length === 0) return word;
+  return stems.find((stem) => KNOWN_WORDS.has(stem)) ?? stems[0];
+}
+
 const ALIASES_BY_LENGTH: readonly (readonly [string, PictogramKey])[] = Object.entries(NAME_ALIASES)
   .sort((a, b) => b[0].length - a[0].length)
   .map(([phrase, key]) => [phrase, key] as const);
@@ -161,17 +202,38 @@ export function resolveExerciseImageKey({ imageKey, name }: ResolveExerciseImage
   const normalized = normalizeExerciseName(typeof name === 'string' ? name : '');
   if (normalized.length === 0) return 'default';
 
-  for (const [phrase, key] of ALIASES_BY_LENGTH) {
-    if (phrase === normalized) return key;
-  }
-
   const tokens = words(normalized);
-  for (const [phrase, key] of ALIASES_BY_LENGTH) {
-    if (containsPhrase(tokens, phrase)) return key;
+  // "Mountain climbing", "Jumping", "Lunging": coaches write the activity as
+  // often as the noun, and every one of those used to fall through to the
+  // `default` pictogram. The stemmed form is tried AFTER the written one at
+  // each step, so nothing that already resolved changes.
+  const stemmed = tokens.map(deGerund);
+  const stemmedName = stemmed.join(' ');
+  const forms: readonly (readonly [string, string[]])[] =
+    stemmedName === normalized
+      ? [[normalized, tokens]]
+      : [
+          [normalized, tokens],
+          [stemmedName, stemmed],
+        ];
+
+  for (const [whole] of forms) {
+    for (const [phrase, key] of ALIASES_BY_LENGTH) {
+      if (phrase === whole) return key;
+    }
   }
 
-  const category = resolveCategory(tokens);
-  return category ? CATEGORY_FALLBACK[category] : 'default';
+  for (const [, form] of forms) {
+    for (const [phrase, key] of ALIASES_BY_LENGTH) {
+      if (containsPhrase(form, phrase)) return key;
+    }
+  }
+
+  for (const [, form] of forms) {
+    const category = resolveCategory(form);
+    if (category) return CATEGORY_FALLBACK[category];
+  }
+  return 'default';
 }
 
 /** The category whose longest keyword appears in `tokens`, or null. */

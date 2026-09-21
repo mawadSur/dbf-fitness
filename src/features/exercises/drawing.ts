@@ -136,6 +136,16 @@ export type PictogramPalette = {
    */
   farOpacity: number;
   ground: string;
+  /**
+   * Opacity for the ground line.
+   *
+   * The line is decorative, but "decorative" is not "invisible": on `borderSoft`
+   * it measured 1.23:1 in light and 1.97:1 in dark, so a low-vision reader saw a
+   * figure floating in space. `borderStrong` clears 3:1 in both themes; in dark
+   * it clears it so far (11.9:1) that the floor out-shouted the figure, so the
+   * dark ground is held back to land just above 3:1 and stay subordinate.
+   */
+  groundOpacity: number;
 };
 
 /** The subset of `ThemeColors` a pictogram needs. */
@@ -143,6 +153,7 @@ export type PictogramColors = {
   cta: string;
   brand: string;
   borderSoft: string;
+  borderStrong: string;
 };
 
 /**
@@ -153,6 +164,18 @@ export type PictogramColors = {
  */
 export function pictogramPalette(colors: PictogramColors, scheme: 'light' | 'dark'): PictogramPalette {
   return scheme === 'dark'
-    ? { near: colors.brand, far: colors.brand, farOpacity: 0.5, ground: colors.borderSoft }
-    : { near: colors.cta, far: colors.brand, farOpacity: 1, ground: colors.borderSoft };
+    ? {
+        near: colors.brand,
+        far: colors.brand,
+        farOpacity: 0.5,
+        ground: colors.borderStrong,
+        groundOpacity: 0.45,
+      }
+    : {
+        near: colors.cta,
+        far: colors.brand,
+        farOpacity: 1,
+        ground: colors.borderStrong,
+        groundOpacity: 1,
+      };
 }

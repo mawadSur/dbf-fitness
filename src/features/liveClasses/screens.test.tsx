@@ -121,7 +121,10 @@ describe('live schedule screen', () => {
     ]);
     await renderWithQuery(<ScheduleScreen />);
 
-    expect(await screen.findByText('Live now')).toBeTruthy();
+    // The section header says "Live now"; since the countdown is now derived
+    // from STATUS first, the card's timing line says "Live now" too instead of
+    // a stale "Starts in ..." / "Started 5 min ago".
+    expect(await screen.findAllByText('Live now')).toHaveLength(2);
     expect(screen.getByText('Live')).toBeTruthy();
   });
 
@@ -281,6 +284,32 @@ describe('live class screen states', () => {
     expect(screen.getAllByText('Preview mode').length).toBeGreaterThan(0);
     expect(screen.getByText(/Nothing is broadcast/)).toBeTruthy();
     expect(screen.getByTestId('live-stage')).toBeTruthy();
+  });
+
+  it('says preview mode once, inside the stage, not twice', async () => {
+    (fetchLiveClass as jest.Mock).mockResolvedValue(liveClass());
+    await renderWithQuery(<ClassScreen />);
+    await fireEvent.press(await screen.findByText('Join class'));
+
+    // A separate Banner above the stage used to repeat the tag word for word
+    // and cost 105pt of a 360x640 screen, pushing the video below the fold.
+    await screen.findByTestId('preview-mode');
+    expect(screen.getAllByTestId('preview-mode')).toHaveLength(1);
+    expect(screen.getAllByText('Preview mode')).toHaveLength(1);
+    expect(screen.getByTestId('live-stage-preview-tag')).toBeTruthy();
+  });
+
+  it('drops the schedule card in call and keeps the status in words', async () => {
+    (fetchLiveClass as jest.Mock).mockResolvedValue(liveClass());
+    await renderWithQuery(<ClassScreen />);
+    // Before joining, the full schedule card with the countdown is the point.
+    expect(await screen.findByTestId('class-summary')).toBeTruthy();
+
+    await fireEvent.press(await screen.findByText('Join class'));
+    await screen.findByTestId('live-stage');
+    expect(screen.queryByTestId('class-summary')).toBeNull();
+    // …replaced by one compact line, so status is still stated, not implied.
+    expect(screen.getByTestId('class-summary-compact')).toBeTruthy();
   });
 
   it('a failed load offers one retry that refetches both queries', async () => {

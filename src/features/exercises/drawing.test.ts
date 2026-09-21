@@ -115,6 +115,33 @@ describe('pictogramPalette', () => {
     }
   });
 
+  it.each(['light', 'dark'] as ThemeName[])(
+    'keeps the ground line visible at 3:1 on the %s panel',
+    (scheme) => {
+      // It was `borderSoft`: 1.23:1 in light and 1.97:1 in dark, i.e. a figure
+      // floating in space for anyone with low vision.
+      const colors = themes[scheme];
+      const palette = pictogramPalette(colors, scheme);
+      for (const background of [colors.bg, colors.bgSoft]) {
+        const effective = blend(palette.ground, background, palette.groundOpacity);
+        expect(contrastRatio(effective, background)).toBeGreaterThanOrEqual(UI_CONTRAST_MIN);
+      }
+    },
+  );
+
+  it('keeps the floor subordinate to the figure standing on it', () => {
+    for (const scheme of ['light', 'dark'] as ThemeName[]) {
+      const colors = themes[scheme];
+      const palette = pictogramPalette(colors, scheme);
+      const ground = blend(palette.ground, colors.bg, palette.groundOpacity);
+      // The figure must out-contrast its own floor, or the drawing reads as a
+      // line with a smudge above it.
+      expect(contrastRatio(palette.near, colors.bg)).toBeGreaterThan(
+        contrastRatio(ground, colors.bg),
+      );
+    }
+  });
+
   it('uses the deep-emerald CTA in light and the brand green in dark', () => {
     expect(pictogramPalette(lightTheme, 'light').near).toBe(lightTheme.cta);
     expect(pictogramPalette(darkTheme, 'dark').near).toBe(darkTheme.brand);

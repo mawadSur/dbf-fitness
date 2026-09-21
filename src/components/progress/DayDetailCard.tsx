@@ -7,6 +7,7 @@ import { Icon } from '../ui/Icon';
 import { hitSlopFor, minTouchTarget } from '../ui/layout';
 import { PressableBase } from '../ui/PressableBase';
 import { Text } from '../ui/Typography';
+import { LevelledHeading } from './LevelledHeading';
 import { dayTitle, type DayCell } from './monthMath';
 
 export type DayDetailCardProps = {
@@ -38,9 +39,10 @@ export function DayDetailCard({ cell, onClose }: DayDetailCardProps) {
     <Card testID="day-detail" tone="raised" style={{ gap: tokens.space.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: tokens.space.sm }}>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text role="h3" accessibilityRole="header">
+          {/* The selected day sits INSIDE the month section: level 3. */}
+          <LevelledHeading level={3} testID="day-detail-title">
             {title}
-          </Text>
+          </LevelledHeading>
           {cell.isToday ? (
             <Text role="caption" tone="muted">
               Today
