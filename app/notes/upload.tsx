@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, View, type ListRenderItemInfo } from 'react-native';
 
 import { Banner, SectionHeader, Text } from '../../src/components/ui';
 import { BottomActionBar } from '../../src/components/notes/BottomActionBar';
@@ -70,6 +70,22 @@ export default function UploadRecordingScreen() {
 
   const deepLinkNotMine =
     !!classIdParam && classesQuery.isSuccess && !listedHit && linkedQuery.isSuccess && !linkedClass;
+
+  // Stable list callbacks: rebuilt inline they change identity on every render
+  // (every keystroke of upload progress), which re-renders every picker row
+  // and throws away FlatList's virtualisation (design system §8).
+  const keyExtractor = useCallback((item: CoachClass) => item.id, []);
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<CoachClass>) => (
+      <ClassPickerRow
+        item={item}
+        selected={item.id === selectedId}
+        disabled={uploading}
+        onPress={() => setPickedId(item.id)}
+      />
+    ),
+    [selectedId, uploading],
+  );
 
   const choose = async () => {
     if (busy.current) return;
@@ -192,7 +208,7 @@ export default function UploadRecordingScreen() {
         <>
           <FlatList
             data={classes}
-            keyExtractor={(c: CoachClass) => c.id}
+            keyExtractor={keyExtractor}
             keyboardShouldPersistTaps="handled"
             extraData={[selectedId, file, uploading]}
             contentContainerStyle={{ padding: 16, paddingBottom: 24, gap: 8 }}
@@ -215,14 +231,7 @@ export default function UploadRecordingScreen() {
                 message="Schedule a live class first, then upload its recording."
               />
             }
-            renderItem={({ item }) => (
-              <ClassPickerRow
-                item={item}
-                selected={item.id === selectedId}
-                disabled={uploading}
-                onPress={() => setPickedId(item.id)}
-              />
-            )}
+            renderItem={renderItem}
             ListFooterComponent={
               <View style={{ gap: 8, marginTop: 16 }}>
                 <SectionHeader eyebrow="Step 2" title="Choose the recording" />

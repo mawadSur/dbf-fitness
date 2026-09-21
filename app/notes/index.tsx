@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
-import { FlatList, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { FlatList, View, type ListRenderItemInfo } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Banner } from '../../src/components/ui';
@@ -64,7 +64,7 @@ export default function NotesIndexScreen() {
     }
   };
 
-  const retry = async (item: RecordingSummary) => {
+  const retry = useCallback(async (item: RecordingSummary) => {
     // An abandoned upload has no file to transcribe: the fix is to upload again.
     const reason = retryReason(item);
     if (reason && retryAction(reason) === 'upload') {
@@ -85,7 +85,24 @@ export default function NotesIndexScreen() {
       setRetryingId(null);
       void queryClient.invalidateQueries({ queryKey: ['notes', 'coach-list'] });
     }
-  };
+  }, [queryClient, router]);
+
+  // FlatList re-renders EVERY row whenever `renderItem`/`keyExtractor` change
+  // identity, so both are memoised: rebuilding them inline defeated the list's
+  // virtualisation on a coach's recording list (design system §8).
+  const keyExtractor = useCallback((item: RecordingSummary) => item.id, []);
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<RecordingSummary>) => (
+      <RecordingListItem
+        recording={item}
+        showStatus={isCoach}
+        retrying={retryingId === item.id}
+        onRetry={isCoach ? () => void retry(item) : undefined}
+        onPress={() => router.push(`/notes/${item.id}`)}
+      />
+    ),
+    [isCoach, retryingId, retry, router],
+  );
 
   if (viewerQuery.isLoading) {
     return (
@@ -142,7 +159,7 @@ export default function NotesIndexScreen() {
       ) : (
         <FlatList
           data={recordings}
-          keyExtractor={(item) => item.id}
+          keyExtractor={keyExtractor}
           refreshing={pullRefreshing}
           onRefresh={() => void refresh()}
           contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 16) + 16, gap: 12 }}
@@ -174,15 +191,7 @@ export default function NotesIndexScreen() {
               }
             />
           }
-          renderItem={({ item }) => (
-            <RecordingListItem
-              recording={item}
-              showStatus={isCoach}
-              retrying={retryingId === item.id}
-              onRetry={isCoach ? () => void retry(item) : undefined}
-              onPress={() => router.push(`/notes/${item.id}`)}
-            />
-          )}
+          renderItem={renderItem}
         />
       )}
     </NotesScreenShell>
