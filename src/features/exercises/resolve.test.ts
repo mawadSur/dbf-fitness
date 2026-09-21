@@ -1,5 +1,12 @@
 import { isPictogramKey, PICTOGRAM_KEYS, type PictogramKey } from './pictograms';
-import { normalizeExerciseName, resolveCategory, resolveExerciseImageKey } from './resolve';
+import {
+  deGerund,
+  gerundStems,
+  NAME_ALIASES,
+  normalizeExerciseName,
+  resolveCategory,
+  resolveExerciseImageKey,
+} from './resolve';
 
 describe('normalizeExerciseName', () => {
   it.each([
@@ -162,5 +169,62 @@ describe('resolveCategory', () => {
   it('lets the longest keyword win over the spec order', () => {
     // "raise" is strength and "leg raise" is core; the longer one decides.
     expect(resolveCategory(['leg', 'raise'])).toBe('core');
+  });
+});
+
+describe('gerunds (coaches write the activity, not the noun)', () => {
+  it.each([
+    ['Mountain climbing', 'mountain-climber'],
+    ['Mountain Climbing', 'mountain-climber'],
+    ['30s mountain climbing', 'mountain-climber'],
+    ['Lunging', 'walking-lunge'],
+    ['Walking lunging', 'walking-lunge'],
+    ['Squatting', 'bodyweight-squat'],
+    ['Planking', 'plank'],
+    ['Pushing up', 'push-up'],
+  ] as const)('%p resolves to %p', (name, key) => {
+    expect(resolveExerciseImageKey({ name })).toBe(key);
+  });
+
+  it.each(['Jumping', 'Running', 'Skipping', 'Jogging', 'Sprinting'])(
+    '%p is recognised as cardio rather than falling through to default',
+    (name) => {
+      const key = resolveExerciseImageKey({ name });
+      expect(key).not.toBe('default');
+      expect(isPictogramKey(key)).toBe(true);
+    }
+  );
+
+  it('does not invent a stem for short words that merely end in -ing', () => {
+    expect(gerundStems('ring')).toEqual([]);
+    expect(gerundStems('swing')).toEqual([]);
+    expect(deGerund('swing')).toBe('swing');
+    // ...and a name made only of those still lands on default, as before.
+    expect(resolveExerciseImageKey({ name: 'Swing' })).toBe('default');
+  });
+
+  it.each([
+    ['climbing', 'climb'],
+    ['lunging', 'lunge'],
+    ['running', 'run'],
+    ['skipping', 'skip'],
+    ['squatting', 'squat'],
+    ['jumping', 'jump'],
+    ['pressing', 'press'],
+    ['stretching', 'stretch'],
+  ] as const)('deGerund(%p) is %p', (word, stem) => {
+    expect(deGerund(word)).toBe(stem);
+  });
+
+  it('leaves an unknown -ing word on the plain stem instead of guessing', () => {
+    expect(deGerund('zumbaing')).toBe('zumba');
+  });
+
+  it('changes nothing for the names that already resolved', () => {
+    // A regression net: every alias must still map to its own pictogram now
+    // that a second, stemmed form is tried.
+    for (const [phrase, key] of Object.entries(NAME_ALIASES)) {
+      expect(resolveExerciseImageKey({ name: phrase })).toBe(key);
+    }
   });
 });

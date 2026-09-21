@@ -13,7 +13,12 @@ import {
   svgFills,
   svgStrokes,
 } from '../ui/testing';
-import { ExercisePictogram, HERO_MAX_WIDTH, THUMB_SIZE } from './ExercisePictogram';
+import {
+  ExercisePictogram,
+  HERO_FRAME_MIN_SIZE,
+  HERO_MAX_WIDTH,
+  THUMB_SIZE,
+} from './ExercisePictogram';
 
 describe('ExercisePictogram — hero', () => {
   it('names the drawing for a screen reader with the full alt sentence', async () => {
@@ -45,15 +50,40 @@ describe('ExercisePictogram — hero', () => {
     );
   });
 
-  it('shrinks the frames to the measured panel, so nothing overflows a 360pt screen', async () => {
-    await renderInTheme(
-      <ExercisePictogram name="Burpees" variant="hero" />,
-    );
-    // 360 screen - 16 gutter each side - 16 panel padding each side.
-    await layoutTo(screen.getByRole('image'), 296, 120);
+  it('reserves each frame by aspect ratio, so the hero never jumps on measure', async () => {
+    await renderInTheme(<ExercisePictogram name="Burpees" variant="hero" />);
+
+    // The cell derives its HEIGHT from its width in the same layout pass; the
+    // frames used to be drawn at a placeholder 96pt and resized afterwards.
+    for (const index of [0, 1, 2]) {
+      const cell = flattenStyle(
+        screen.getByTestId(`exercise-pictogram-cell-${index}`, INCLUDING_HIDDEN).props.style,
+      );
+      expect(cell.aspectRatio).toBe(1);
+      expect(cell.width).toBe('100%');
+      expect(cell.minWidth).toBe(HERO_FRAME_MIN_SIZE);
+    }
+
+    // The svg fills its cell, so the size is settled by the cell, not by a
+    // measurement that arrives a frame later.
     const frame = screen.getByTestId('exercise-pictogram-frame-0', INCLUDING_HIDDEN);
-    expect(frame.props.width).toBeLessThanOrEqual(296 / 3);
-    expect(frame.props.width).toBeGreaterThan(0);
+    expect([frame.props.width, frame.props.height]).toEqual(['100%', '100%']);
+
+    // And there is nothing left to re-measure: no onLayout means no second
+    // pass, which is what removes the jump rather than merely hiding it.
+    expect(screen.getByRole('image').props.onLayout).toBeUndefined();
+    await expect(layoutTo(screen.getByRole('image'), 296, 120)).rejects.toThrow(
+      'no onLayout handler',
+    );
+  });
+
+  it('splits the row evenly between the frames, with the arrows outside the cells', async () => {
+    // Three equal flex cells: inside them, frame 0 would be one arrow wider.
+    await renderInTheme(<ExercisePictogram name="Burpees" variant="hero" />);
+    for (const index of [0, 1, 2]) {
+      const cell = screen.getByTestId(`exercise-pictogram-cell-${index}`, INCLUDING_HIDDEN);
+      expect(flattenStyle(cell.parent?.props.style).flex).toBe(1);
+    }
   });
 
   it.each(BOTH_THEMES)('uses only theme colours in %s', async (scheme: ThemeName) => {

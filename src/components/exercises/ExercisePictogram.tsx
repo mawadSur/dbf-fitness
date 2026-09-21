@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { Fragment } from 'react';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import {
@@ -22,8 +22,8 @@ export const THUMB_SIZE = 56;
 export const HERO_MAX_WIDTH = 640;
 /** Gap between a frame and the arrow that follows it. */
 const FRAME_GAP = 4;
-/** Until the panel has been measured, draw at a size that fits any phone. */
-const UNMEASURED_FRAME_SIZE = 96;
+/** The smallest a hero frame is allowed to get before it stops being readable. */
+export const HERO_FRAME_MIN_SIZE = 56;
 
 export type ExercisePictogramProps = {
   /** A stored pictogram key; ignored when it is not one the registry knows. */
@@ -46,7 +46,8 @@ function Frame({
 }: {
   frame: FrameDrawing;
   palette: PictogramPalette;
-  size: number;
+  /** A fixed side in points, or `'100%'` to fill an aspect-ratio'd cell. */
+  size: number | string;
   viewBox: string;
   testID: string;
 }) {
@@ -54,7 +55,12 @@ function Frame({
     <Svg width={size} height={size} viewBox={viewBox} testID={testID} {...svgAccessibilityProps()}>
       {frame.shapes.map((shape, index) => {
         const color = shape.role === 'ground' ? palette.ground : palette[shape.role];
-        const opacity = shape.role === 'far' ? palette.farOpacity : 1;
+        const opacity =
+          shape.role === 'far'
+            ? palette.farOpacity
+            : shape.role === 'ground'
+              ? palette.groundOpacity
+              : 1;
         return shape.kind === 'circle' ? (
           <Circle
             key={index}
@@ -92,8 +98,6 @@ function Frame({
  */
 export function ExercisePictogram({ imageKey, name, variant, style, testID }: ExercisePictogramProps) {
   const { colors, scheme } = useOptionalTheme();
-  const [panelWidth, setPanelWidth] = useState<number | null>(null);
-
   const key = resolveExerciseImageKey({ imageKey, name });
   const drawing = pictogramDrawing(key);
   const palette = pictogramPalette(colors, scheme);
@@ -136,10 +140,6 @@ export function ExercisePictogram({ imageKey, name, variant, style, testID }: Ex
   }
 
   const count = drawing.frames.length;
-  const arrows = Math.max(0, count - 1);
-  const available = panelWidth === null ? null : panelWidth - arrows * (20 + FRAME_GAP * 2);
-  const frameSize =
-    available === null ? UNMEASURED_FRAME_SIZE : Math.max(56, Math.floor(available / count));
 
   return (
     <HeroPanel
@@ -147,38 +147,49 @@ export function ExercisePictogram({ imageKey, name, variant, style, testID }: Ex
       testID={testID ?? 'exercise-pictogram-hero'}
       style={[{ maxWidth: HERO_MAX_WIDTH, width: '100%' }, style]}
     >
+      {/*
+        The frames used to be drawn at a placeholder 96pt until `onLayout`
+        reported the panel width, then re-drawn at the real size — a visible
+        jump of the whole hero on every exercise screen. Now each frame is a
+        flex cell with `aspectRatio: 1`, so its height follows from its width
+        in the SAME layout pass: the space is reserved before anything is
+        painted and nothing moves afterwards (design system §8).
+      */}
       <View
         accessible
         accessibilityRole="image"
         accessibilityLabel={`Illustration: ${drawing.alt}`}
-        onLayout={(event: LayoutChangeEvent) => {
-          const { width } = event.nativeEvent.layout;
-          setPanelWidth((current) => (current === width ? current : width));
-        }}
         style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center' }}
       >
         {drawing.frames.map((frame, index) => (
-          <View key={index} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Fragment key={index}>
             {index > 0 ? (
-              <View style={{ paddingHorizontal: FRAME_GAP }}>
+              // Arrows sit OUTSIDE the flex cells so every frame gets the same
+              // width; inside them the first frame would be one arrow wider.
+              <View style={{ paddingHorizontal: FRAME_GAP, alignSelf: 'center' }}>
                 <Icon name="chevron-right" size={20} color={colors.textMuted} />
               </View>
             ) : null}
-            <View style={{ alignItems: 'center' }}>
-              <Frame
-                frame={frame}
-                palette={palette}
-                size={frameSize}
-                viewBox={`0 0 ${drawing.viewBox} ${drawing.viewBox}`}
-                testID={`exercise-pictogram-frame-${index}`}
-              />
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <View
+                testID={`exercise-pictogram-cell-${index}`}
+                style={{ width: '100%', aspectRatio: 1, minWidth: HERO_FRAME_MIN_SIZE }}
+              >
+                <Frame
+                  frame={frame}
+                  palette={palette}
+                  size="100%"
+                  viewBox={`0 0 ${drawing.viewBox} ${drawing.viewBox}`}
+                  testID={`exercise-pictogram-frame-${index}`}
+                />
+              </View>
               {count > 1 ? (
                 <Text role="caption" color={colors.textMuted}>
                   {index + 1}
                 </Text>
               ) : null}
             </View>
-          </View>
+          </Fragment>
         ))}
       </View>
     </HeroPanel>
