@@ -11,7 +11,7 @@ Everything here needs accounts or decisions the codebase cannot provision. Every
 | First-run coach onboarding | Not built; new sign-ups have `coach_id` null (coach-selection screen is in progress) |
 | Monitoring / crash reporting | Not set up (no Sentry/Crashlytics, no function alerting) |
 | Payment webhook | Not built; nothing writes `public.subscriptions` except manual/seed rows |
-| `live-class-reminder` scheduling | pg_cron/pg_net or scheduled invocation not configured |
+| Push scheduling secrets | The two `pg_cron` jobs exist and run (`dbf-notification-drain`, `dbf-live-class-reminders`), but the drain tick is a **no-op until the two Vault secrets below are created** — it logs a NOTICE and sends nothing. The reminder tick needs no configuration and works as soon as the migration is applied |
 
 ## Accounts and stores
 
@@ -27,10 +27,20 @@ Everything here needs accounts or decisions the codebase cannot provision. Every
 - [ ] Run `select public.apply_realtime_presence_policies();` if `pg_policies` on `realtime.messages` is empty
 - [ ] Realtime: enable private-channel authorization; confirm the `realtime.messages` policies exist
 - [ ] Function secrets: `supabase secrets set AGORA_APP_ID AGORA_APP_CERTIFICATE DEEPGRAM_API_KEY ANTHROPIC_API_KEY` (service role/URL/anon are injected)
-- [ ] Deploy functions: `agora-rtc-token`, `transcribe-recording`, `live-class-reminder`
+- [ ] Deploy functions: `agora-rtc-token`, `transcribe-recording`, `live-class-reminder`, `notification-drain`
 - [ ] Auth settings: local `config.toml` has `enable_confirmations = false` and `minimum_password_length = 6`; decide hosted values (email confirmation on, stronger password rules), configure SMTP and redirect URLs
 - [ ] Backups / PITR; do not run seed data in production
-- [ ] Schedule `live-class-reminder` every minute with the service-role Bearer
+- [ ] **Push scheduling.** `20260921142000_notification_scheduling.sql` creates `pg_cron`/`pg_net` and schedules two every-minute jobs, idempotently (it unschedules by name first, so replaying migrations never duplicates them):
+  - `dbf-live-class-reminders` → `public.enqueue_live_class_reminders_tick()` — pure SQL, needs no configuration.
+  - `dbf-notification-drain` → `public.drain_notifications_tick()` — POSTs the `notification-drain` function. **It does nothing until both Vault secrets exist** (it raises a NOTICE and returns NULL), which is why a fresh database never fires HTTP at an unconfigured environment. Create them, then re-run the scheduler:
+    ```sql
+    select vault.create_secret('https://<project-ref>.supabase.co/functions/v1/notification-drain', 'notification_drain_url');
+    select vault.create_secret('<service-role-key>', 'notification_service_role_key');
+    select public.schedule_notification_jobs();
+    ```
+    Never put either value in a migration or an env file that is committed. Verify with `select jobname, schedule, active from cron.job;` and `select status, count(*) from public.notification_outbox group by 1;`.
+  - If a hosted environment lacks `pg_cron`, the migration skips scheduling with a NOTICE and both ticks must be driven by an external scheduler POSTing the two functions every minute with the service-role Bearer.
+  - The URL must be reachable **from the database server**, not from your laptop: `pg_net` runs inside Postgres. Probed locally by pointing the secret at the function and calling the tick by hand — `127.0.0.1` gave `Couldn't connect to server` in `net._http_response`, the container hostname (`http://supabase_kong_dbf:8000/functions/v1/notification-drain`) gave a real HTTP status. Use the project's public function URL in a hosted project.
 
 ## Vendors (each UNVERIFIED)
 
