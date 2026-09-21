@@ -157,6 +157,12 @@ select matches(
 --   ad00…03  Member Stay   Coach V's OTHER member: survives, coach_id -> null
 --   ad00…04  Coach Other   unrelated tenant
 --   ad00…05  Member Other  Coach Other's member: must be untouched throughout
+--   ad00…07  Member Stay2  Coach V's member, on a plan Coach OTHER authored.
+--                          Carries the "scored by the departing coach, but the
+--                          plan is not theirs" completion. Split out of Member
+--                          Stay by 20260921100000, which made workout_plans
+--                          UNIQUE(member_id): one member can no longer hold
+--                          both their own coach's plan and another coach's.
 -- ---------------------------------------------------------------------------
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
 values
@@ -164,14 +170,16 @@ values
   ('ad000000-0000-4000-8000-000000000002','00000000-0000-0000-0000-000000000000','authenticated','authenticated','ad-memberv@test.invalid','x',now(),now()),
   ('ad000000-0000-4000-8000-000000000003','00000000-0000-0000-0000-000000000000','authenticated','authenticated','ad-stay@test.invalid','x',now(),now()),
   ('ad000000-0000-4000-8000-000000000004','00000000-0000-0000-0000-000000000000','authenticated','authenticated','ad-coacho@test.invalid','x',now(),now()),
-  ('ad000000-0000-4000-8000-000000000005','00000000-0000-0000-0000-000000000000','authenticated','authenticated','ad-membero@test.invalid','x',now(),now());
+  ('ad000000-0000-4000-8000-000000000005','00000000-0000-0000-0000-000000000000','authenticated','authenticated','ad-membero@test.invalid','x',now(),now()),
+  ('ad000000-0000-4000-8000-000000000007','00000000-0000-0000-0000-000000000000','authenticated','authenticated','ad-stay2@test.invalid','x',now(),now());
 
 insert into public.profiles (id, role, coach_id, full_name) values
   ('ad000000-0000-4000-8000-000000000001','coach',  null,                                   'AD Coach V'),
   ('ad000000-0000-4000-8000-000000000002','member','ad000000-0000-4000-8000-000000000001','AD Member V'),
   ('ad000000-0000-4000-8000-000000000003','member','ad000000-0000-4000-8000-000000000001','AD Member Stay'),
   ('ad000000-0000-4000-8000-000000000004','coach',  null,                                   'AD Coach Other'),
-  ('ad000000-0000-4000-8000-000000000005','member','ad000000-0000-4000-8000-000000000004','AD Member Other');
+  ('ad000000-0000-4000-8000-000000000005','member','ad000000-0000-4000-8000-000000000004','AD Member Other'),
+  ('ad000000-0000-4000-8000-000000000007','member','ad000000-0000-4000-8000-000000000001','AD Member Stay2');
 
 insert into public.coach_profiles (coach_id, bio) values
   ('ad000000-0000-4000-8000-000000000001','V'),
@@ -210,13 +218,15 @@ insert into public.workout_note_progress (member_id, note_id, item_key) values
 
 -- e5 is Coach V's plan for Member Stay: it goes when Coach V goes
 -- (workout_plans_coach_id_fkey has always been ON DELETE CASCADE).
--- e0 is a plan Coach OTHER wrote for Member Stay, whose day-1 workout Coach V
+-- e0 is a plan Coach OTHER wrote for Member Stay2, whose day-1 workout Coach V
 -- happened to score — the row that proves scored_by is a SET NULL and not a
--- cascade.
+-- cascade. It hung off Member Stay until 20260921100000 made workout_plans
+-- UNIQUE(member_id); it is Member Stay2's plan now, which changes nothing the
+-- assertions below are about (the scoring coach, not the plan's member).
 insert into public.workout_plans (id, member_id, coach_id, title) values
   ('ad000000-0000-4000-8000-0000000000e1','ad000000-0000-4000-8000-000000000002','ad000000-0000-4000-8000-000000000001','AD Plan V'),
   ('ad000000-0000-4000-8000-0000000000e5','ad000000-0000-4000-8000-000000000003','ad000000-0000-4000-8000-000000000001','AD Plan Stay'),
-  ('ad000000-0000-4000-8000-0000000000e0','ad000000-0000-4000-8000-000000000003','ad000000-0000-4000-8000-000000000004','AD Plan Stay (other coach)'),
+  ('ad000000-0000-4000-8000-0000000000e0','ad000000-0000-4000-8000-000000000007','ad000000-0000-4000-8000-000000000004','AD Plan Stay2 (other coach)'),
   ('ad000000-0000-4000-8000-0000000000e9','ad000000-0000-4000-8000-000000000005','ad000000-0000-4000-8000-000000000004','AD Plan O');
 insert into public.workout_days (id, workout_plan_id, day_number, block_name) values
   ('ad000000-0000-4000-8000-0000000000e2','ad000000-0000-4000-8000-0000000000e1',1,'B'),
@@ -226,12 +236,14 @@ insert into public.workout_days (id, workout_plan_id, day_number, block_name) va
 insert into public.exercises (id, workout_day_id, name, reps_or_duration, order_index) values
   ('ad000000-0000-4000-8000-0000000000e3','ad000000-0000-4000-8000-0000000000e2','E','10',1),
   ('ad000000-0000-4000-8000-0000000000eb','ad000000-0000-4000-8000-0000000000ea','E','10',1);
--- e7 (on Coach V's plan) is expected to go WITH the plan.
+-- e7 is Member Stay's session on Coach V's plan. Before 20260921100000 it was
+-- cascade-deleted with the plan; it must now SURVIVE the coach's departure with
+-- workout_day_id nulled and its snapshot intact (that migration's whole point).
 -- ed (on Coach Other's plan, scored by Coach V) must survive with scored_by null.
 insert into public.workout_completions (id, member_id, workout_day_id, scored_by, effort_score) values
   ('ad000000-0000-4000-8000-0000000000e4','ad000000-0000-4000-8000-000000000002','ad000000-0000-4000-8000-0000000000e2','ad000000-0000-4000-8000-000000000001',7),
   ('ad000000-0000-4000-8000-0000000000e7','ad000000-0000-4000-8000-000000000003','ad000000-0000-4000-8000-0000000000e6','ad000000-0000-4000-8000-000000000001',6),
-  ('ad000000-0000-4000-8000-0000000000ed','ad000000-0000-4000-8000-000000000003','ad000000-0000-4000-8000-0000000000e8','ad000000-0000-4000-8000-000000000001',8),
+  ('ad000000-0000-4000-8000-0000000000ed','ad000000-0000-4000-8000-000000000007','ad000000-0000-4000-8000-0000000000e8','ad000000-0000-4000-8000-000000000001',8),
   ('ad000000-0000-4000-8000-0000000000ec','ad000000-0000-4000-8000-000000000005','ad000000-0000-4000-8000-0000000000ea','ad000000-0000-4000-8000-000000000004',5);
 insert into public.exercise_completions (workout_completion_id, exercise_id) values
   ('ad000000-0000-4000-8000-0000000000e4','ad000000-0000-4000-8000-0000000000e3'),
@@ -263,7 +275,9 @@ insert into public.diet_checkins (member_id, diet_item_id) values
 -- the member's rows with it, and only what is independent of Coach V remains.
 -- ---------------------------------------------------------------------------
 insert into public.exercises (id, workout_day_id, name, reps_or_duration, order_index) values
-  ('ad000000-0000-4000-8000-0000000000fd','ad000000-0000-4000-8000-0000000000e6','E','10',1);
+-- Distinctive name so section D can prove the surviving tick carries the
+-- SNAPSHOT of the exercise the cascade removed, not a live join to it.
+  ('ad000000-0000-4000-8000-0000000000fd','ad000000-0000-4000-8000-0000000000e6','Goblet Squat','10',1);
 insert into public.exercise_completions (workout_completion_id, exercise_id) values
   ('ad000000-0000-4000-8000-0000000000e7','ad000000-0000-4000-8000-0000000000fd');
 
@@ -407,22 +421,39 @@ select is(
 
 -- Documented consequence, not a regression: workout_plans_coach_id_fkey has been
 -- ON DELETE CASCADE since 20260919114448, so a plan the deleting coach AUTHORED
--- goes, and the member's completions on it go with it. Left as-is: coach_id is
--- NOT NULL, so there is no set-null alternative without a schema change well
--- outside account deletion. Asserted here so the behaviour is deliberate and a
--- future change to it shows up as a test failure.
+-- goes. Left as-is: coach_id is NOT NULL, so there is no set-null alternative
+-- without a schema change well outside account deletion.
+--
+-- What CHANGED in 20260921100000: the member's HISTORY no longer goes with it.
+-- workout_completions.workout_day_id and exercise_completions.exercise_id are
+-- ON DELETE SET NULL now, and both rows carry a snapshot of what they were, so
+-- a departing coach takes their plan and nothing of the member's training
+-- record. The three assertions below asserted the opposite until that migration
+-- and are inverted here deliberately.
 select is(
   (select count(*)::int from public.workout_plans where id = 'ad000000-0000-4000-8000-0000000000e5'),
   0, 'D a plan the deleted coach AUTHORED is removed (pre-existing cascade)');
 select is(
   (select count(*)::int from public.workout_completions where id = 'ad000000-0000-4000-8000-0000000000e7'),
-  0, 'D ...and the member''s completions on that plan go with it');
+  1, 'D ...but the member''s completion on that plan SURVIVES it (20260921100000)');
+select is(
+  (select workout_day_id from public.workout_completions where id = 'ad000000-0000-4000-8000-0000000000e7'),
+  null::uuid,
+  'D ...with workout_day_id nulled rather than the row deleted');
+select is(
+  (select block_name from public.workout_completions where id = 'ad000000-0000-4000-8000-0000000000e7'),
+  'B', 'D ...and the snapshot of the day it was still readable');
 select is(
   (select count(*)::int from public.exercise_completions where workout_completion_id = 'ad000000-0000-4000-8000-0000000000e7'),
-  0, 'D ...and the exercise ticks inside those completions go with them');
+  1, 'D ...and the exercise ticks inside it survive too');
+select is(
+  (select exercise_name from public.exercise_completions
+    where workout_completion_id = 'ad000000-0000-4000-8000-0000000000e7'),
+  'Goblet Squat',
+  'D ...each keeping the name of the exercise the cascade removed');
 select is(
   (select count(*)::int from public.workout_plans where id = 'ad000000-0000-4000-8000-0000000000e0'),
-  1, 'D a plan ANOTHER coach wrote for the same member is untouched');
+  1, 'D a plan ANOTHER coach wrote is untouched');
 
 -- ---------------------------------------------------------------------------
 -- D (cont.). The full blast radius onto the SURVIVING member (review
