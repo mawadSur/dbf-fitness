@@ -12,7 +12,7 @@ import HomeScreen from '../../../app/(tabs)/index';
 import WorkoutDayScreen from '../../../app/(tabs)/workout/[dayId]';
 import ExerciseDetailScreen from '../../../app/(tabs)/workout/exercise/[id]';
 import WorkoutScreen from '../../../app/(tabs)/workout/index';
-import { fakeCalls, resetFake, setSession, setTable } from './fakeSupabase';
+import { fakeCalls, fakeRpcCalls, resetFake, setRpc, setSession, setTable } from './fakeSupabase';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -506,8 +506,54 @@ describe('Workout day and exercise error states', () => {
     setTable('exercises', () =>
       ok([{ id: 'e1', name: 'Bench', reps_or_duration: '5x5', order_index: 1 }])
     );
+    setTable('workout_completions', () => ok(null));
+    setRpc('finish_workout', () =>
+      ok([{ completion_id: 'comp-1', already_logged: false, completed_at: '2026-09-21T08:00:00Z' }]),
+    );
+    await renderScreen(<WorkoutDayScreen />);
+    await fireEvent.press(await screen.findByRole('checkbox', { name: 'Bench' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Finish workout' }));
+
+    expect(await screen.findByText(/Workout complete/)).toBeTruthy();
+    // ONE atomic call now, not two client inserts that could half-apply.
+    const call = fakeRpcCalls.find((c) => c.name === 'finish_workout');
+    expect(call?.args).toMatchObject({ p_workout_day_id: 'd1', p_exercise_ids: ['e1'] });
+    expect(typeof (call?.args as { p_client_request_id?: unknown }).p_client_request_id).toBe(
+      'string',
+    );
+    expect(fakeCalls.some((c) => c.table === 'exercise_completions')).toBe(false);
+  });
+
+  // `finish_workout` is idempotent: a repeat for the same local day comes back
+  // as a normal 200 with already_logged, NOT the 23505 the two-insert path threw.
+  it('day screen treats an idempotent repeat as "already logged", not a celebration', async () => {
+    mockParams = { dayId: 'd1' };
+    setTable('workout_days', () => ok({ day_number: 1, block_name: 'Push' }));
+    setTable('exercises', () =>
+      ok([{ id: 'e1', name: 'Bench', reps_or_duration: '5x5', order_index: 1 }])
+    );
+    setTable('workout_completions', () => ok(null));
+    setRpc('finish_workout', () =>
+      ok([{ completion_id: 'comp-1', already_logged: true, completed_at: '2026-09-21T08:00:00Z' }]),
+    );
+    await renderScreen(<WorkoutDayScreen />);
+    await fireEvent.press(await screen.findByRole('button', { name: 'Finish workout' }));
+
+    expect(await screen.findByText(/already logged this workout today/)).toBeTruthy();
+    expect(screen.queryByText(/Workout complete/)).toBeNull();
+    expect(screen.queryByTestId('finish-error')).toBeNull();
+  });
+
+  // TEMPORARY BRIDGE guard — delete with the fallback once D1a is merged.
+  it('day screen still finishes against a database without finish_workout yet', async () => {
+    mockParams = { dayId: 'd1' };
+    setTable('workout_days', () => ok({ day_number: 1, block_name: 'Push' }));
+    setTable('exercises', () =>
+      ok([{ id: 'e1', name: 'Bench', reps_or_duration: '5x5', order_index: 1 }])
+    );
     setTable('workout_completions', () => ok({ id: 'comp-1' }));
     setTable('exercise_completions', () => ok(null));
+    // No setRpc: the fake answers PGRST202 exactly like PostgREST does.
     await renderScreen(<WorkoutDayScreen />);
     await fireEvent.press(await screen.findByRole('checkbox', { name: 'Bench' }));
     await fireEvent.press(screen.getByRole('button', { name: 'Finish workout' }));

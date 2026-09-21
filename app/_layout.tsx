@@ -10,6 +10,9 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { RoleProvider } from '../src/features/auth/RoleProvider';
+import { SessionEffects } from '../src/features/auth/SessionEffects';
+import { bindAuthCacheReset } from '../src/services/authCacheReset';
 import { queryClient } from '../src/services/queryClient';
 import { bindAuthAutoRefresh } from '../src/services/supabase/autoRefresh';
 import { supabase } from '../src/services/supabase/client';
@@ -91,6 +94,11 @@ function RootNavigator() {
 
   useEffect(() => bindAuthAutoRefresh(supabase.auth, AppState, Platform.OS), []);
 
+  // The TanStack cache is process-wide, so it outlives the account that filled
+  // it: without this, signing into a second account on the same device served
+  // the first account's plan, stats and notes from cache.
+  useEffect(() => bindAuthCacheReset(supabase.auth, queryClient), []);
+
   // The splash covers the first frames, so it only drops once the session gate
   // AND the fonts have settled — no flash of system-font text.
   useEffect(() => {
@@ -127,8 +135,15 @@ function RootNavigator() {
   // old `router.replace` in an effect fired in the same commit that first mounted <Stack>).
   const signedIn = !!session;
 
+  // RoleProvider sits INSIDE the session gate: it never fetches for a
+  // signed-out user, and every screen reads one cached answer instead of
+  // running its own `profiles.select('role')` on mount. It is UI shaping only —
+  // `Stack.Protected` and `useRole()` decide what to DRAW; RLS policies and the
+  // SECURITY DEFINER bodies of the RPCs decide what the server will hand over.
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <RoleProvider>
+      {signedIn ? <SessionEffects userId={session?.user.id ?? null} /> : null}
+      <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(tabs)" />
         {/*
@@ -154,7 +169,8 @@ function RootNavigator() {
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
-    </Stack>
+      </Stack>
+    </RoleProvider>
   );
 }
 

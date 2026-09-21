@@ -21,6 +21,7 @@ import {
   Text,
 } from '../../src/components/ui';
 import { useMyCoach } from '../../src/features/coaching/hooks';
+import { releasePushTokenBeforeSignOut } from '../../src/features/notifications/client/signOutCleanup';
 import { useSubscriptionState } from '../../src/features/subscriptions/useSubscriptionState';
 import { supabase } from '../../src/services/supabase/client';
 
@@ -104,6 +105,11 @@ export default function ProfileScreen() {
     setSigningOut(true);
     setSignOutError(null);
     try {
+      // Release this device's push token FIRST: after `signOut()` there is no
+      // JWT left and the RPC would be rejected, leaving the next person to sign
+      // in on this phone receiving the previous member's reminders. Best effort
+      // with a 3 s timeout inside — it can never block or fail the sign-out.
+      await releasePushTokenBeforeSignOut();
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       queryClient.clear();

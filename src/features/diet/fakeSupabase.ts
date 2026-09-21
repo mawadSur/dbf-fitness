@@ -14,17 +14,34 @@ export type FakeOps = {
 export type FakeResult = { data: unknown; error: Error | null };
 type Handler = (ops: FakeOps) => FakeResult | Promise<FakeResult>;
 
+/** A recorded `supabase.rpc(name, args)` call. */
+export type FakeRpcCall = { name: string; args: unknown };
+type RpcHandler = (args: unknown) => FakeResult | Promise<FakeResult>;
+
 const handlers = new Map<string, Handler>();
+const rpcHandlers = new Map<string, RpcHandler>();
 export const fakeCalls: FakeOps[] = [];
+export const fakeRpcCalls: FakeRpcCall[] = [];
 let session: { user: { id: string } } | null = { user: { id: 'user-1' } };
 
 export function resetFake() {
   handlers.clear();
+  rpcHandlers.clear();
   fakeCalls.length = 0;
+  fakeRpcCalls.length = 0;
   session = { user: { id: 'user-1' } };
 }
 export function setTable(table: string, handler: Handler) {
   handlers.set(table, handler);
+}
+/**
+ * Register a stand-in for one SECURITY DEFINER function. An unregistered name
+ * answers the way PostgREST does when the function is not deployed (PGRST202),
+ * so a test that forgets to stub one fails loudly instead of silently
+ * "succeeding" against a database that does not have it.
+ */
+export function setRpc(name: string, handler: RpcHandler) {
+  rpcHandlers.set(name, handler);
 }
 export function setSession(next: { user: { id: string } } | null) {
   session = next;
@@ -74,6 +91,19 @@ function makeBuilder(table: string) {
 
 export const fakeSupabase = {
   from: (table: string) => makeBuilder(table),
+  rpc: (name: string, args?: unknown) => {
+    fakeRpcCalls.push({ name, args });
+    const handler = rpcHandlers.get(name);
+    if (!handler) {
+      return Promise.resolve({
+        data: null,
+        error: Object.assign(new Error(`Could not find the function public.${name}`), {
+          code: 'PGRST202',
+        }),
+      });
+    }
+    return Promise.resolve(handler(args));
+  },
   auth: {
     getSession: () => Promise.resolve({ data: { session } }),
     onAuthStateChange: () => ({

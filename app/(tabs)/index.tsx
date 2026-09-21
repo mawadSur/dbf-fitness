@@ -7,13 +7,9 @@ import { friendlyErrorFromMany } from '../../src/components/friendlyError';
 import { MemberHome } from '../../src/components/home/MemberHome';
 import { StaffHome } from '../../src/components/home/StaffHome';
 import { Banner, Button, ScreenHeader, ScreenShell } from '../../src/components/ui';
+import { useRole } from '../../src/features/auth/RoleProvider';
 import { useMyCoach } from '../../src/features/coaching';
-import {
-  greeting,
-  isStaffRole,
-  memberHomePrimary,
-  type ProfileRole,
-} from '../../src/features/workouts/homeState';
+import { greeting, isStaffRole, memberHomePrimary } from '../../src/features/workouts/homeState';
 import { fetchPlanOverview } from '../../src/features/workouts/queries';
 import { useDelayedVisible } from '../../src/components/ui/useDelayedVisible';
 import { supabase } from '../../src/services/supabase/client';
@@ -46,7 +42,7 @@ export default function HomeScreen() {
       if (!userId) throw new Error('Missing session');
       const { data, error } = await supabase
         .from('profiles')
-        .select('full_name, role')
+        .select('full_name')
         .eq('id', userId)
         .single();
       if (error) throw error;
@@ -77,8 +73,12 @@ export default function HomeScreen() {
     enabled: !!userId,
   });
 
+  // The role comes from the session-wide `RoleProvider`, not a second fetch on
+  // this mount: Home, effort-review and the notes checks each used to run their
+  // own `profiles.select('role')`, so staff paid three round trips for one fact
+  // and each screen drew member UI until its own request landed.
   // Only members have a coach: don't fire the request for coaches/admins (or before the role is known).
-  const role = (profileQuery.data?.role ?? null) as ProfileRole | null;
+  const { role } = useRole();
   const myCoachQuery = useMyCoach({ enabled: role === 'member' });
   const isStaff = isStaffRole(role);
 

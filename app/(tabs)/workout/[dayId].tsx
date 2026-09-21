@@ -22,8 +22,9 @@ import {
   describeFinishWorkoutError,
   isAlreadyLoggedTodayError,
 } from '../../../src/features/workouts/finishWorkoutErrors';
+import { finishWorkout, newClientRequestId } from '../../../src/features/workouts/finishWorkout';
 import { checklistProgress, durationCopy } from '../../../src/features/workouts/planSummary';
-import { fetchWorkoutDay, finishWorkout } from '../../../src/features/workouts/queries';
+import { fetchWorkoutDay } from '../../../src/features/workouts/queries';
 import { useDelayedVisible } from '../../../src/components/ui/useDelayedVisible';
 import type { ExerciseListRow } from '../../../src/types/exercise';
 
@@ -34,6 +35,10 @@ export default function WorkoutDayScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [justFinished, setJustFinished] = useState(false);
+  const [alreadyLoggedFromServer, setAlreadyLoggedFromServer] = useState(false);
+  // One id for the whole mount: tapping Finish again after a timeout is the
+  // same attempt, not a second workout.
+  const clientRequestId = useMemo(() => newClientRequestId(), []);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['workout', 'day', dayId],
@@ -44,8 +49,13 @@ export default function WorkoutDayScreen() {
   const showSkeleton = useDelayedVisible(isLoading);
 
   const finishMutation = useMutation({
-    mutationFn: () => finishWorkout(dayId, Array.from(checkedIds)),
-    onSuccess: () => {
+    mutationFn: () =>
+      finishWorkout({
+        dayId,
+        exerciseIds: Array.from(checkedIds),
+        clientRequestId,
+      }),
+    onSuccess: (result) => {
       // Refresh the day list + this day's own queries, and the calendar's stats/history
       // (both derive from workout_completions).
       queryClient.invalidateQueries({ queryKey: ['workout'] });
@@ -53,7 +63,11 @@ export default function WorkoutDayScreen() {
       // Force the milestone checker mounted below to evaluate against fresh
       // stats instead of a cached pre-finish snapshot.
       queryClient.invalidateQueries({ queryKey: ['milestone-check'] });
-      setJustFinished(true);
+      // `finish_workout` is idempotent: a repeat for the same local day returns
+      // the existing row instead of the 23505 the two-insert path used to throw.
+      // That is not a celebration, so it takes the already-logged branch.
+      if (result.alreadyLogged) setAlreadyLoggedFromServer(true);
+      else setJustFinished(true);
     },
   });
 
@@ -132,8 +146,10 @@ export default function WorkoutDayScreen() {
     );
   }
 
-  // Either the server already has today's row, or this session just hit the 23505.
-  const alreadyLoggedToday = data.completedToday || isAlreadyLoggedTodayError(finishMutation.error);
+  // The server already had today's row (on load, or as the idempotent answer to
+  // this tap), or the legacy insert path hit the 23505.
+  const alreadyLoggedToday =
+    data.completedToday || alreadyLoggedFromServer || isAlreadyLoggedTodayError(finishMutation.error);
   const duration = durationCopy(data.durationMinutes);
 
   return (
