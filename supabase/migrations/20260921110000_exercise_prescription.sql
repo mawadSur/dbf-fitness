@@ -388,7 +388,10 @@ begin
 
   if p_weight is not null and p_mode <> 'notes' then
     -- trim_scale drops the stored 2dp when the coach meant a whole number.
-    v_weight := trim(to_char(trim_scale(p_weight), 'FM9990.99'));
+    -- FM suppresses the padding but NOT the decimal point, so to_char(20)
+    -- comes back as '20.' and would render "@ 20.kg"; the rtrim removes that
+    -- orphan point. It cannot eat a real digit, so '0.5' survives intact.
+    v_weight := rtrim(trim(to_char(trim_scale(p_weight), 'FM9990.99')), '.');
     v_core := v_core || ' @ ' || v_weight || coalesce(p_weight_unit, 'kg');
   end if;
 
