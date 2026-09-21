@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { rippleFor } from '../../theme/tokens';
 import { Icon } from './Icon';
 import { hitSlopFor, minTouchTarget } from './layout';
 import { PressableBase } from './PressableBase';
@@ -144,7 +145,7 @@ export function Input({
             accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
             accessibilityState={{ selected: revealed, disabled }}
             hitSlop={hitSlopFor(target, Platform.OS) + 4}
-            android_ripple={{ color: colors.bgSoft, borderless: true }}
+            android_ripple={{ color: rippleFor(colors.text), borderless: true }}
             // Layout NEVER goes in a style callback — see `PressableBase`.
             style={{ width: target, height: target, alignItems: 'center', justifyContent: 'center' }}
           >

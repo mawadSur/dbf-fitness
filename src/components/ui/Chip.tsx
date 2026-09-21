@@ -1,6 +1,7 @@
 import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { rippleFor } from '../../theme/tokens';
 import { Icon } from './Icon';
 import type { IconName } from './icons';
 import { hitSlopFor } from './layout';
@@ -141,7 +142,7 @@ export function Chip({
       disabled={disabled}
       {...chipAccessibilityProps(Platform.OS, { label, selected, disabled, selectionRole })}
       hitSlop={hitSlopFor(CHIP_HEIGHT, Platform.OS)}
-      android_ripple={disabled ? undefined : { color: colors.bgSoft }}
+      android_ripple={disabled ? undefined : { color: rippleFor(colors.text) }}
       // Layout NEVER goes in a style callback — see `PressableBase`.
       pressFeedback={disabled ? 'none' : 'ds'}
       style={[base, style]}

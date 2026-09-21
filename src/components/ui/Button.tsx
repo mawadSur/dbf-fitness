@@ -1,7 +1,7 @@
 import { ActivityIndicator, Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useOptionalTheme } from '../../theme/ThemeProvider';
-import type { ThemeColors } from '../../theme/tokens';
+import { rippleFor, type ThemeColors } from '../../theme/tokens';
 import { Icon } from './Icon';
 import type { IconName } from './icons';
 import { BUTTON_HEIGHT, hitSlopFor, type ButtonSize } from './layout';
@@ -27,22 +27,33 @@ export type ButtonProps = {
   testID?: string;
 };
 
-type Skin = { background: string; content: string; border: string | null; ripple: string };
+type Skin = { background: string; content: string; border: string | null };
+
+/**
+ * Android's press ink for a skin.
+ *
+ * Always derived from the skin's CONTENT colour, never from another opaque
+ * token: `primary` in the dark theme is `cta` #34D399 filled and used to be
+ * handed `brand` #34D399 as its ripple — the same colour, so the press drew
+ * nothing at all. See `rippleFor` in `src/theme/tokens.ts`.
+ */
+function rippleOf(skin: Skin): string {
+  return rippleFor(skin.content);
+}
 
 function skinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
   switch (variant) {
     case 'secondary':
-      return { background: 'transparent', content: colors.text, border: colors.text, ripple: colors.bgSoft };
+      return { background: 'transparent', content: colors.text, border: colors.text };
     case 'ghost':
       return {
         background: 'transparent',
         content: colors.textSecondary,
         border: null,
-        ripple: colors.bgSoft,
       };
     case 'danger':
       // The status *background* token is the readable foreground on the status fill.
-      return { background: colors.danger, content: colors.dangerBg, border: null, ripple: colors.dangerBg };
+      return { background: colors.danger, content: colors.dangerBg, border: null };
     case 'danger-outline':
       // `secondary`, but in the danger tone: for an irreversible action that is
       // only the ENTRY to a confirmation, so it must read as destructive at a
@@ -51,11 +62,10 @@ function skinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
         background: 'transparent',
         content: colors.danger,
         border: colors.danger,
-        ripple: colors.dangerBg,
       };
     case 'primary':
     default:
-      return { background: colors.cta, content: colors.onCta, border: null, ripple: colors.brand };
+      return { background: colors.cta, content: colors.onCta, border: null };
   }
 }
 
@@ -93,7 +103,6 @@ function disabledSkinFor(variant: ButtonVariant, colors: ThemeColors): Skin {
     background: enabled.background === 'transparent' ? 'transparent' : colors.disabledBg,
     content: colors.disabledFg,
     border: enabled.border ? colors.disabledFg : null,
-    ripple: colors.disabledBg,
   };
 }
 
@@ -134,7 +143,7 @@ export function Button({
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: inert, busy: loading }}
       hitSlop={hitSlopFor(height, Platform.OS)}
-      android_ripple={inert ? undefined : { color: skin.ripple }}
+      android_ripple={inert ? undefined : { color: rippleOf(skin) }}
       // Layout NEVER goes in a style callback — see `PressableBase`.
       pressFeedback={inert ? 'none' : 'ds'}
       style={[

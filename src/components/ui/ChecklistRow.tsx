@@ -1,6 +1,7 @@
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { rippleFor } from '../../theme/tokens';
 import { Icon } from './Icon';
 import { PressableBase } from './PressableBase';
 import { Text } from './Typography';
@@ -64,7 +65,7 @@ export function ChecklistRow({
         accessibilityRole="checkbox"
         accessibilityLabel={label}
         accessibilityState={{ checked, disabled }}
-        android_ripple={disabled ? undefined : { color: colors.bgSoft, borderless: true }}
+        android_ripple={disabled ? undefined : { color: rippleFor(colors.text), borderless: true }}
         // Layout NEVER goes in a style callback — see `PressableBase`.
         pressFeedback={disabled ? 'none' : 'ds'}
         style={{
@@ -97,7 +98,7 @@ export function ChecklistRow({
         accessibilityRole={onPress ? 'button' : undefined}
         accessibilityLabel={onPress ? `${label}, details` : undefined}
         accessibilityState={onPress ? { disabled } : undefined}
-        android_ripple={onPress && !disabled ? { color: colors.bgSoft } : undefined}
+        android_ripple={onPress && !disabled ? { color: rippleFor(colors.text) } : undefined}
         // Layout NEVER goes in a style callback — see `PressableBase`.
         pressFeedback={onPress && !disabled ? 'ds' : 'none'}
         style={{ minHeight: CHECK_TARGET_SIZE, flex: 1, justifyContent: 'center', paddingVertical: 8 }}

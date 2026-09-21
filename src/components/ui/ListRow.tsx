@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useOptionalTheme } from '../../theme/ThemeProvider';
+import { rippleFor } from '../../theme/tokens';
 import { Icon } from './Icon';
 import type { IconName } from './icons';
 import { PressableBase } from './PressableBase';
@@ -90,7 +91,7 @@ export function ListRow({
       accessibilityLabel={accessibilityLabel ?? title}
       accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled }}
-      android_ripple={disabled ? undefined : { color: colors.bgSoft }}
+      android_ripple={disabled ? undefined : { color: rippleFor(colors.text) }}
       // Layout NEVER goes in a style callback — see `PressableBase`.
       pressFeedback={disabled ? 'none' : 'ds'}
       style={[base, style]}

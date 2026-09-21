@@ -11,6 +11,8 @@
  * See `docs/design-system.md`.
  */
 
+import { parseHex } from './contrast';
+
 export type ThemeName = 'light' | 'dark';
 
 export type ThemeColors = {
@@ -317,6 +319,43 @@ export const motion = {
   pressScale: 0.98,
   pressOpacity: 0.92,
 } as const;
+
+/**
+ * How opaque Android's press ink is over the surface it lands on.
+ *
+ * Material draws the ripple as the CONTENT colour at a low alpha, never as
+ * another opaque surface colour. 0.24 is the value at which the composite is
+ * >= 1.2:1 away from what it is drawn on for every control in both themes
+ * (`src/theme/ripple.test.ts` asserts it) — the same "a decorative tint still
+ * has to be visible" floor the contrast suite uses.
+ */
+export const RIPPLE_ALPHA = 0.24;
+
+/**
+ * The Android ripple ink for a control whose CONTENT is `color`.
+ *
+ * WHY THIS EXISTS — the ripple used to be handed another OPAQUE palette token,
+ * and on a dark screen those tokens collide with what they are drawn on. A
+ * dark-theme primary button is `cta` #34D399 filled and was given `brand`
+ * #34D399 as its ripple: the SAME COLOUR, so Android's press feedback drew
+ * nothing at all and the only thing left was `motion.pressOpacity`, which on an
+ * already-dark page is a few percent of pixel change — the ~0.985 that was
+ * measured on device where 0.92 was expected. Every `bgSoft` ripple had the
+ * same shape of problem over the dark page (#022C22 ink on #011A14).
+ *
+ * Deriving the ink from the CONTENT colour cannot collide: the content colour
+ * is already >= 4.5:1 against its own fill (the contrast suite enforces that),
+ * so a 24% wash of it is always visible on that fill — in both themes, for
+ * every variant, without a single per-theme branch.
+ *
+ * `rgba()` and not a token, deliberately: `ThemeColors` is mirrored into
+ * `global.css` as `R G B` channel triplets (`cssTokens.test.ts` enforces the
+ * parity) and an alpha colour cannot be written in that form.
+ */
+export function rippleFor(color: string, alpha: number = RIPPLE_ALPHA): string {
+  const [r, g, b] = parseHex(color);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 export const tokens = {
   fontFamily,
