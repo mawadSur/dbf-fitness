@@ -15,14 +15,18 @@ import { Banner } from '../src/components/ui/Banner';
 import { EmptyState } from '../src/components/ui/EmptyState';
 import { ScreenHeader } from '../src/components/ui/ScreenHeader';
 import { ScreenShell } from '../src/components/ui/ScreenShell';
+import { useRole } from '../src/features/auth/RoleProvider';
 import { supabase } from '../src/services/supabase/client';
 import { useOptionalTheme } from '../src/theme/ThemeProvider';
 
 /** Unchanged: the newest 50 completions are what a coach reviews in one sitting. */
 const REVIEW_LIMIT = 50;
 
-type AccessInfo = { userId: string; role: string } | null;
-
+// The role no longer comes from here: `useRole()` fetches it once per session
+// for the whole app, so this screen only still needs to know WHO the coach is
+// (for `scored_by`). Keeping a second `profiles.select('role')` on this mount
+// meant a coach paid two round trips for one fact and saw "Coaches only" for a
+// frame while the second one was in flight.
 type CompletionRow = {
   id: string;
   member_id: string;
@@ -31,19 +35,9 @@ type CompletionRow = {
   completed_at: string;
 };
 
-async function fetchAccess(): Promise<AccessInfo> {
+async function fetchCoachId(): Promise<string | null> {
   const { data: session } = await supabase.auth.getSession();
-  const userId = session.session?.user.id;
-  if (!userId) return null;
-
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .single();
-  if (error) throw error;
-
-  return { userId, role: profile.role as string };
+  return session.session?.user.id ?? null;
 }
 
 async function fetchCompletionsForReview(): Promise<ReviewRow[]> {
@@ -90,11 +84,19 @@ export default function EffortReviewScreen() {
 
   const accessQuery = useQuery({
     queryKey: ['effort', 'review', 'access'],
-    queryFn: fetchAccess,
+    queryFn: fetchCoachId,
   });
+  const roleState = useRole();
 
-  const coachId = accessQuery.data?.userId ?? null;
-  const isCoach = accessQuery.data?.role === 'coach';
+  const coachId = accessQuery.data ?? null;
+  const isCoach = roleState.role === 'coach';
+  const isAccessLoading = accessQuery.isLoading || roleState.isLoading;
+  const isAccessError = accessQuery.isError || roleState.isError;
+  const accessError = accessQuery.error ?? roleState.error;
+  const retryAccess = () => {
+    void accessQuery.refetch();
+    roleState.refresh();
+  };
 
   const completionsQuery = useQuery({
     queryKey: ['effort', 'review', coachId],
@@ -134,13 +136,14 @@ export default function EffortReviewScreen() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await (isCoach ? completionsQuery.refetch() : accessQuery.refetch());
+      if (isCoach) await completionsQuery.refetch();
+      else retryAccess();
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  const showAccessSkeleton = useDelayedVisible(accessQuery.isLoading);
+  const showAccessSkeleton = useDelayedVisible(isAccessLoading);
   const showListSkeleton = useDelayedVisible(completionsQuery.isLoading);
   const savingId = scoreMutation.isPending ? scoreMutation.variables?.completionId : undefined;
 
@@ -159,15 +162,15 @@ export default function EffortReviewScreen() {
 
   const header = <ScreenHeader eyebrow="Coaching" title="Effort review" onBack={goBack} />;
 
-  if (accessQuery.isLoading || accessQuery.isError || !isCoach) {
+  if (isAccessLoading || isAccessError || !isCoach) {
     return (
       <ScreenShell testID="effort-review" header={header} contentStyle={{ gap: tokens.space.lg }}>
-        {accessQuery.isError ? (
+        {isAccessError ? (
           <ErrorBlock
-            message={friendlyErrorMessage(accessQuery.error, 'Could not check your access.')}
-            onRetry={() => accessQuery.refetch()}
+            message={friendlyErrorMessage(accessError, 'Could not check your access.')}
+            onRetry={retryAccess}
           />
-        ) : accessQuery.isLoading ? (
+        ) : isAccessLoading ? (
           showAccessSkeleton ? (
             <ReviewListSkeleton count={2} />
           ) : null

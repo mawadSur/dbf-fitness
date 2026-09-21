@@ -61,8 +61,29 @@ jest.mock('expo-splash-screen', () => ({
 }));
 jest.mock('react-native-safe-area-context', () => ({ SafeAreaProvider: ({ children }: { children: never }) => children }));
 jest.mock('../../services/supabase/autoRefresh', () => ({ bindAuthAutoRefresh: jest.fn(() => jest.fn()) }));
+// The per-session side effects (push registration, notification taps, timezone
+// sync) have their own tests and the tap subscriber is the ONE thing in the
+// tree that touches the router — stubbing it here keeps this file's guarantee
+// that the LAYOUT itself never does.
+jest.mock('./SessionEffects', () => ({
+  SessionEffects: ({ userId }: { userId: string | null }) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { View } = require('react-native');
+    return <View testID={`session-effects-${userId ?? 'none'}`} />;
+  },
+}));
 jest.mock('../../services/supabase/client', () => ({
-  supabase: { auth: { getSession: jest.fn(), onAuthStateChange: jest.fn() } },
+  supabase: {
+    auth: { getSession: jest.fn(), onAuthStateChange: jest.fn() },
+    // RoleProvider reads `profiles.role` once the session gate opens.
+    from: jest.fn(() => {
+      const builder: Record<string, unknown> = {};
+      builder.select = () => builder;
+      builder.eq = () => builder;
+      builder.maybeSingle = () => Promise.resolve({ data: { role: 'member' }, error: null });
+      return builder;
+    }),
+  },
 }));
 
 const getSession = supabase.auth.getSession as jest.Mock;
