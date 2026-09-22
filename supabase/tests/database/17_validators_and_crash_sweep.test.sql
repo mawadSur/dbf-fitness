@@ -23,7 +23,7 @@ create extension if not exists pgtap with schema extensions;
 -- assertions both resolve under every identity this file assumes.
 set local search_path = public, extensions;
 
-select plan(38);
+select plan(39);
 
 -- ===========================================================================
 -- is_valid_note_checklist -- the CHECK behind workout_notes.draft_content and
@@ -144,73 +144,92 @@ select is(
       and p.prosecdef
       and p.prorettype <> 'trigger'::regtype
       and p.proname <> 'apply_realtime_presence_policies'),
-  array['can_join_group', 'can_join_live_class', 'can_manage_recording', 'can_read_published_notes', 'can_read_workout_note', 'can_see_live_class', 'can_use_group_presence_topic', 'can_use_live_class_presence_topic', 'can_use_presence_topic', 'choose_coach', 'get_group_roster', 'get_my_coach', 'get_subscription_state', 'has_earned_milestone', 'has_live_access', 'is_admin', 'is_assigned_diet_item', 'is_blocked_pair', 'is_coach_of_diet_plan', 'is_coach_of_member', 'is_coach_of_workout_day', 'is_coach_or_admin', 'is_fellow_group_member', 'is_member_of_diet_plan', 'list_coaches', 'live_class_exists', 'owns_workout_day', 'recording_coach_id', 'subscription_state_row']::text[],
-  'sweep: the catalog holds exactly the 29 definers the sweep list names (a rename fails here)');
+  array['admin_cancel_subscription', 'admin_list_reports', 'admin_list_subscriptions', 'admin_mark_paid', 'apply_starter_template', 'assert_admin_caller', 'attention_counts', 'can_join_group', 'can_join_live_class', 'can_manage_recording', 'can_read_published_notes', 'can_read_workout_note', 'can_see_live_class', 'can_use_group_presence_topic', 'can_use_live_class_presence_topic', 'can_use_presence_topic', 'choose_coach', 'claim_notifications', 'coach_roster', 'complete_notification', 'drain_notifications_tick', 'enqueue_live_class_reminders', 'enqueue_live_class_reminders_tick', 'fail_notification', 'finish_workout', 'get_group_roster', 'get_my_coach', 'get_subscription_state', 'has_earned_milestone', 'has_live_access', 'is_admin', 'is_assigned_diet_item', 'is_blocked_pair', 'is_coach_of_diet_plan', 'is_coach_of_member', 'is_coach_of_workout_day', 'is_coach_or_admin', 'is_fellow_group_member', 'is_member_of_diet_plan', 'list_coaches', 'live_class_exists', 'member_history', 'notification_setting', 'owns_workout_day', 'plan_editor_gate', 'prune_push_tokens', 'publish_plan', 'recording_coach_id', 'register_push_token', 'remove_from_group', 'review_report', 'roster_scope', 'save_plan_draft', 'schedule_notification_jobs', 'send_nudge', 'snooze_member', 'subscription_state_row', 'unregister_push_token', 'unscored_completions']::text[],
+  'sweep: the catalog holds exactly the 59 definers this file names (a rename, or a definer added without updating this test, fails here)');
 
 set local role anon;
 select set_config('request.jwt.claim.sub', '', true);
 
+-- The call list is DERIVED from pg_proc rather than typed out, so a definer
+-- added by a later migration is swept automatically instead of quietly
+-- escaping the net; every argument is passed as an explicit NULL cast to its
+-- declared type, which also disambiguates any overload.
 do $sweep$
 declare
-  v_calls text[] := array[
-    'public.can_join_group(null::uuid)',
-    'public.can_join_live_class(null::uuid)',
-    'public.can_manage_recording(null::uuid)',
-    'public.can_read_published_notes(null::uuid)',
-    'public.can_read_workout_note(null::uuid)',
-    'public.can_see_live_class(null::uuid)',
-    'public.can_use_group_presence_topic(''group:7a110000-0000-4000-8000-0000000000e1'')',
-    'public.can_use_live_class_presence_topic(''live:7a110000-0000-4000-8000-0000000000c1'')',
-    'public.can_use_presence_topic(''group:not-a-uuid'')',
-    'public.choose_coach(null::uuid)',
-    'public.get_group_roster(null::uuid)',
-    'public.get_my_coach()',
-    'public.get_subscription_state()',
-    'public.has_earned_milestone(null::uuid, ''first_day'')',
-    'public.has_live_access(null::uuid)',
-    'public.is_admin(null::uuid)',
-    'public.is_assigned_diet_item(null::uuid)',
-    'public.is_blocked_pair(null::uuid)',
-    'public.is_coach_of_diet_plan(null::uuid)',
-    'public.is_coach_of_member(null::uuid)',
-    'public.is_coach_of_workout_day(null::uuid)',
-    'public.is_coach_or_admin(null::uuid)',
-    'public.is_fellow_group_member(null::uuid)',
-    'public.is_member_of_diet_plan(null::uuid)',
-    'public.list_coaches()',
-    'public.live_class_exists(null::uuid)',
-    'public.owns_workout_day(null::uuid)',
-    'public.recording_coach_id(null::uuid)',
-    'public.subscription_state_row(null::uuid)'
-  ];
-  v_bad  text[] := '{}';
-  v_call text;
-  v_i    int;
-  v_n    int := 0;
+  v_bad    text[] := '{}';
+  v_states text[] := '{}';
+  v_name   text;
+  v_call   text;
+  v_i      int;
+  v_n      int := 0;
 begin
   for v_i in 1..3 loop
-    foreach v_call in array v_calls loop
+    for v_name, v_call in
+      select p.proname::text,
+             'public.' || quote_ident(p.proname) || '(' ||
+             coalesce((select string_agg('null::' || format_type(t, null), ', ' order by ord)
+                         from unnest(p.proargtypes) with ordinality as u(t, ord)), '') || ')'
+        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and p.prosecdef
+         and p.prorettype <> 'trigger'::regtype
+         and p.proname <> 'apply_realtime_presence_policies'
+       order by p.proname, p.oid
+    loop
       v_n := v_n + 1;
       begin
-        -- `select * from f(...)` works for scalar and set-returning alike.
+        -- `select count(*) from f(...)` works for scalar and set-returning alike.
         execute 'select count(*) from ' || v_call;
       exception when others then
-        if not (v_call = any (v_bad)) then
-          v_bad := v_bad || v_call;
+        if not (v_name = any (v_bad)) then
+          v_bad := v_bad || v_name;
+        end if;
+        if not (sqlstate = any (v_states)) then
+          v_states := v_states || sqlstate;
         end if;
       end;
     end loop;
   end loop;
   perform set_config('app.s11_sweep_n', v_n::text, true);
   perform set_config('app.s11_sweep_bad', array_to_string(v_bad, ','), true);
+  perform set_config('app.s11_sweep_states',
+                     array_to_string(array(select unnest(v_states) order by 1), ','), true);
 end
 $sweep$;
 
-select is(current_setting('app.s11_sweep_n')::int, 87,
-          'sweep: 29 definers x 3 calls each completed as anon');
+reset role;
+select is(
+  current_setting('app.s11_sweep_n')::int,
+  3 * (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.prosecdef
+          and p.prorettype <> 'trigger'::regtype
+          and p.proname <> 'apply_realtime_presence_policies'),
+  'sweep: every definer in the catalog was called three times as anon, none skipped');
+
+-- Every definer that refuses anon must refuse it deliberately, never through an
+-- internal error (a null-deref, or a missing-table 42P01, would mean the gate is
+-- an accident rather than a decision). 42501 is the house style; choose_coach is
+-- the one hold-out, raising 'not_authenticated' without an errcode (P0001).
+select is(current_setting('app.s11_sweep_states'), '42501,P0001',
+          'sweep: anon refusals are deliberate (42501, plus choose_coach''s P0001) and nothing else raised');
+
+-- The refusals are the POINT: these definers gate in their body (42501, and
+-- P0001 not_authenticated for choose_coach) instead of relying on EXECUTE
+-- privilege, which is what segfaults this Postgres. A definer DROPPING off
+-- this list has stopped gating anon and must fail the suite.
+set local role anon;
+select set_config('request.jwt.claim.sub', '', true);
 select is(current_setting('app.s11_sweep_bad'),
-          'public.choose_coach(null::uuid)',
-          'sweep: the only definer that raises for anon is choose_coach (not_authenticated)');
+          'admin_cancel_subscription,admin_list_reports,admin_list_subscriptions,'
+          'admin_mark_paid,assert_admin_caller,attention_counts,choose_coach,'
+          'claim_notifications,coach_roster,complete_notification,'
+          'drain_notifications_tick,enqueue_live_class_reminders,'
+          'enqueue_live_class_reminders_tick,fail_notification,finish_workout,'
+          'member_history,notification_setting,plan_editor_gate,prune_push_tokens,'
+          'publish_plan,register_push_token,remove_from_group,review_report,'
+          'roster_scope,save_plan_draft,schedule_notification_jobs,send_nudge,'
+          'snooze_member,unregister_push_token,unscored_completions',
+          'sweep: exactly the 30 definers that gate in-body refuse anon, and no other');
 select is((select count(*)::int from public.profiles), 0,
           'sweep: the backend is alive and RLS still denies anon after the sweep');
 

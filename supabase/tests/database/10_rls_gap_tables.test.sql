@@ -165,22 +165,25 @@ select is((select count(*)::int from public.moderation_reports
             where reported_user_id = '7a100000-0000-4000-8000-000000000005'), 0,
           'moderation_reports: the reported member cannot see the report');                -- 17
 
--- The reporter's coach is a moderator for it...
+-- 20260921131000 (moderation_admin) replaced the "reporter or moderator" pair
+-- of policies with "reporter or admin": a coach is no longer a moderator by
+-- virtue of a relationship to either party. Neither coach may read or action it
+-- now; the admin control below is what keeps these from passing vacuously.
 select set_config('request.jwt.claim.sub', '7a100000-0000-4000-8000-000000000001', true);
 select is((select count(*)::int from public.moderation_reports
-            where reporter_id = '7a100000-0000-4000-8000-000000000002'), 1,
-          'moderation_reports: the reporter coach can see the report');                    -- 18
+            where reporter_id = '7a100000-0000-4000-8000-000000000002'), 0,
+          'moderation_reports: the reporter coach cannot see the report (admin-only)');    -- 18
 with u as (update public.moderation_reports set status = 'reviewed'
             where reporter_id = '7a100000-0000-4000-8000-000000000002'
               and reported_user_id = '7a100000-0000-4000-8000-000000000005' returning 1)
-select is((select count(*)::int from u), 1,
-          'moderation_reports: the reporter coach can move it to reviewed');               -- 19
+select is((select count(*)::int from u), 0,
+          'moderation_reports: the reporter coach cannot move it to reviewed');            -- 19
 
--- ...and so is the reported member's coach.
+-- ...and neither is the reported member's coach.
 select set_config('request.jwt.claim.sub', '7a100000-0000-4000-8000-000000000004', true);
 select is((select count(*)::int from public.moderation_reports
-            where reported_user_id = '7a100000-0000-4000-8000-000000000005'), 1,
-          'moderation_reports: the reported member coach can see the report');             -- 20
+            where reported_user_id = '7a100000-0000-4000-8000-000000000005'), 0,
+          'moderation_reports: the reported member coach cannot see the report');          -- 20
 
 -- Admin sees it; an unrelated member does not.
 select set_config('request.jwt.claim.sub', '7a100000-0000-4000-8000-000000000006', true);

@@ -501,24 +501,31 @@ select throws_ok(
   '42501', null,
   'exercise_completions: a member cannot write against another member''s completion');     -- 73
 
--- DEFECT probe (recorded, not fixed here): the WITH CHECK constrains only the
--- PARENT completion's owner, never that exercise_id belongs to the same day.
--- So a member can attach any exercise in the database to their own completion.
-select lives_ok(
+-- The defect this file used to record (the WITH CHECK constrained only the
+-- PARENT completion's owner, never that exercise_id belonged to the same day, so
+-- a member could attach any exercise in the database to their own completion) is
+-- FIXED by the exercise_completions_enforce_day() trigger from 20260921100000
+-- (plan_integrity). It now raises 23514 instead of accepting the row.
+select throws_ok(
   $$insert into public.exercise_completions (id, workout_completion_id, exercise_id)
     values ('7a150000-0000-4000-8000-000000007002',
             '7a150000-0000-4000-8000-000000005001',
             '7a150000-0000-4000-8000-000000004002')$$,
-  'exercise_completions DEFECT: a cross-plan exercise_id is accepted (no day check)');     -- 74
+  '23514',
+  'exercise 7a150000-0000-4000-8000-000000004002 does not belong to the workout day of completion 7a150000-0000-4000-8000-000000005001',
+  'exercise_completions: a cross-plan exercise_id is now REFUSED (day check added)');      -- 74
 
 select set_config('request.jwt.claim.sub', '7a150000-0000-4000-8000-000000000005', true);
 select is((select count(*)::int from public.exercise_completions
             where id::text like '7a15%'), 0,
           'exercise_completions: another member reads none of them');                      -- 75
+-- 20260921100000 (plan_integrity) added exercise_completions_select_coach, so
+-- the member's OWN coach now reads their ticked exercises (they need it to see
+-- what was actually done). Another coach (75, above) still reads none.
 select set_config('request.jwt.claim.sub', '7a150000-0000-4000-8000-000000000001', true);
 select is((select count(*)::int from public.exercise_completions
-            where id::text like '7a15%'), 0,
-          'exercise_completions: the member''s own coach reads none either');              -- 76
+            where id::text like '7a15%'), 1,
+          'exercise_completions: the member''s own coach now reads them');                 -- 76
 select set_config('request.jwt.claim.sub', '7a150000-0000-4000-8000-000000000002', true);
 with d as (delete from public.exercise_completions
             where id = '7a150000-0000-4000-8000-000000007001' returning 1)

@@ -95,6 +95,33 @@ describe('ChecklistRow (design system)', () => {
     expect(flattenStyle(screen.getByTestId('row').props.style).opacity).toBe(0.45);
   });
 
+  // A workout already logged for today: the ticks are a record of what was
+  // done, so they must not be editable — but the member can still open the
+  // exercise, and work they have finished must not be dimmed to 45%.
+  it('locks only the checkbox when toggleDisabled, keeping details and full contrast', async () => {
+    const onToggle = jest.fn();
+    const onPress = jest.fn();
+    await renderInTheme(
+      <ChecklistRow
+        {...base}
+        checked
+        onToggle={onToggle}
+        onPress={onPress}
+        toggleDisabled
+        testID="row"
+      />,
+    );
+
+    const box = screen.getByRole('checkbox', { name: 'Back squat' });
+    await fireEvent.press(box);
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(box.props.accessibilityState).toMatchObject({ checked: true, disabled: true });
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Back squat, details' }));
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(flattenStyle(screen.getByTestId('row').props.style).opacity).toBe(1);
+  });
+
   it('shrinks the checkbox on press', async () => {
     await renderInTheme(<ChecklistRow {...base} />);
     const box = screen.getByRole('checkbox', { name: 'Back squat' });

@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useOptionalTheme } from '../../theme/ThemeProvider';
 import { rippleFor } from '../../theme/tokens';
 import { Icon } from './Icon';
-import { hitSlopFor, minTouchTarget, screenGutter } from './layout';
+import { hitSlopFor, minTouchTarget, screenGutter, titleLines } from './layout';
 import { PressableBase } from './PressableBase';
 import { useScreenShell } from './ScreenShellContext';
 import { Eyebrow, Heading } from './Typography';
@@ -49,7 +49,7 @@ export function ScreenHeader({
   const { colors, tokens } = useOptionalTheme();
   const insets = useSafeAreaInsets();
   const shell = useScreenShell();
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
 
   const target = minTouchTarget(Platform.OS);
   // The same gutter the shell's scroll content uses, so the h1 and the body
@@ -87,7 +87,8 @@ export function ScreenHeader({
         ) : null}
         <View style={{ flex: 1, gap: 2 }}>
           {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
-          <Heading level={1} numberOfLines={2}>
+          {/* A coach-written block name is long: it wraps rather than ellipsising. */}
+          <Heading level={1} numberOfLines={titleLines(fontScale)}>
             {title}
           </Heading>
         </View>

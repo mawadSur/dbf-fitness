@@ -12,6 +12,8 @@ export type ExerciseChecklistRowProps = {
   onToggle: () => void;
   onPress: () => void;
   disabled?: boolean;
+  /** Locks the checkbox only — for a day already logged, where it is a record. */
+  toggleDisabled?: boolean;
   testID?: string;
 };
 
@@ -34,6 +36,7 @@ export function ExerciseChecklistRow({
   onToggle,
   onPress,
   disabled = false,
+  toggleDisabled = false,
   testID,
 }: ExerciseChecklistRowProps) {
   return (
@@ -49,6 +52,7 @@ export function ExerciseChecklistRow({
         onToggle={onToggle}
         onPress={onPress}
         disabled={disabled}
+        toggleDisabled={toggleDisabled}
         style={{ flex: 1 }}
       />
     </View>

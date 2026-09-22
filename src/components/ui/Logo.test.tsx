@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react-native';
 
 import { lightTheme } from '../../theme/tokens';
-import { Logo, LOGO_ASPECT_RATIO, LOGO_BADGE_RADIUS } from './Logo';
+import { Logo, LOGO_ASPECT_RATIO, LOGO_BADGE_PADDING, LOGO_BADGE_RADIUS } from './Logo';
 import { flattenStyle, renderInTheme } from './testing';
 
 describe('Logo', () => {
@@ -23,16 +23,30 @@ describe('Logo', () => {
     expect(style.width).toBeCloseTo(48 * LOGO_ASPECT_RATIO, 5);
   });
 
-  it('needs no badge on a light background', async () => {
-    await renderInTheme(<Logo />, 'light');
-    expect(screen.queryByTestId('logo-badge')).toBeNull();
-  });
-
-  it('places itself on a light rounded badge in dark mode, where the black wordmark would vanish', async () => {
+  it('places itself on a light rounded badge, where the black wordmark would otherwise vanish', async () => {
     await renderInTheme(<Logo />, 'dark');
     const badge = flattenStyle(screen.getByTestId('logo-badge').props.style);
     expect(badge.backgroundColor).toBe(lightTheme.bgSoft);
     expect(badge.borderRadius).toBe(LOGO_BADGE_RADIUS);
+    expect(badge.padding).toBe(LOGO_BADGE_PADDING);
+  });
+
+  // The two theme tests assert the SAME constants on purpose: that is the
+  // regression. `auto` used to mean "badge in dark only", so the brand mark on
+  // sign-in was a flush 40pt artwork in light and a 64pt round badge in dark.
+  it('is the same badge in light mode — one treatment, not one per theme', async () => {
+    await renderInTheme(<Logo />, 'light');
+    const badge = flattenStyle(screen.getByTestId('logo-badge').props.style);
+    expect(badge.backgroundColor).toBe(lightTheme.bgSoft);
+    expect(badge.borderRadius).toBe(LOGO_BADGE_RADIUS);
+    expect(badge.padding).toBe(LOGO_BADGE_PADDING);
+  });
+
+  it('renders the artwork at the same size in both themes', async () => {
+    await renderInTheme(<Logo height={40} />, 'light');
+    const style = flattenStyle(screen.getByTestId('logo-image').props.style);
+    expect(style.height).toBe(40);
+    expect(style.width).toBeCloseTo(40 * LOGO_ASPECT_RATIO, 5);
   });
 
   it('can be forced onto the badge in light mode', async () => {

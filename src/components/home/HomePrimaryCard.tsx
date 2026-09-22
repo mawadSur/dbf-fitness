@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import type { HomePrimary } from '../../features/workouts/homeState';
 import { nextDaySummary, startDayLabel } from '../../features/workouts/planSummary';
@@ -13,6 +13,7 @@ import {
   Skeleton,
   Text,
 } from '../ui';
+import { titleLines } from '../ui/layout';
 
 export type HomePrimaryCardProps = {
   primary: HomePrimary;
@@ -48,6 +49,8 @@ export function HomePrimaryCard({
   showSkeleton = true,
   testID = 'home-primary',
 }: HomePrimaryCardProps) {
+  const { fontScale } = useWindowDimensions();
+
   switch (primary.kind) {
     case 'loading':
       return (
@@ -124,7 +127,8 @@ export function HomePrimaryCard({
         <Card padding={24} tone="raised" testID={`${testID}-next-day`}>
           <View style={{ gap: 8 }}>
             <Eyebrow>{`Day ${day.dayNumber} of ${totalDays}`}</Eyebrow>
-            <Heading level={2} numberOfLines={2}>
+            {/* Same rule as the day screen's h1: the block name wraps, never ellipsises. */}
+            <Heading level={2} numberOfLines={titleLines(fontScale)}>
               {day.blockName}
             </Heading>
             <Text tone="secondary">{nextDaySummary(day)}</Text>

@@ -95,6 +95,15 @@ export type WorkoutDayDetail = {
   exercises: ExerciseListRow[];
   /** Already logged during the current UTC day — the DB would reject a second insert. */
   completedToday: boolean;
+  /**
+   * Exercise ids ticked on today's completion; empty unless `completedToday`.
+   *
+   * Without these the screen re-opened a logged day with every box empty and
+   * "0 of 3 done" above a footer that said "Logged for today".
+   */
+  completedExerciseIds: string[];
+  /** The signed-in member, for the local draft key. Null when signed out. */
+  memberId: string | null;
 };
 
 export async function fetchWorkoutDay(dayId: string): Promise<WorkoutDayDetail> {
@@ -115,19 +124,38 @@ export async function fetchWorkoutDay(dayId: string): Promise<WorkoutDayDetail> 
   // Mirrors the DB key (member_id, workout_day_id, (completed_at at time zone 'utc')::date)
   // from migration 20260919152200, so the button is disabled exactly when an insert
   // would 23505. Repeating the day on a later date stays allowed.
+  //
+  // The row's ID is selected rather than counted, because the completion is
+  // also what the screen's ticks are hydrated FROM: its `exercise_completions`
+  // are the record of which exercises the member actually did.
   let completedToday = false;
+  let completedExerciseIds: string[] = [];
   const memberId = await getMemberId();
   if (memberId) {
     const { startInclusive, endExclusive } = utcDayRange();
-    const { count, error: completedError } = await supabase
+    const { data: completion, error: completedError } = await supabase
       .from('workout_completions')
-      .select('id', { count: 'exact', head: true })
+      .select('id')
       .eq('member_id', memberId)
       .eq('workout_day_id', dayId)
       .gte('completed_at', startInclusive)
-      .lt('completed_at', endExclusive);
+      .lt('completed_at', endExclusive)
+      .order('completed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
     if (completedError) throw completedError;
-    completedToday = (count ?? 0) > 0;
+    completedToday = !!completion;
+
+    if (completion) {
+      const { data: ticked, error: tickedError } = await supabase
+        .from('exercise_completions')
+        .select('exercise_id')
+        .eq('workout_completion_id', completion.id);
+      if (tickedError) throw tickedError;
+      completedExerciseIds = ((ticked ?? []) as { exercise_id: string }[]).map(
+        (row) => row.exercise_id,
+      );
+    }
   }
 
   return {
@@ -136,6 +164,8 @@ export async function fetchWorkoutDay(dayId: string): Promise<WorkoutDayDetail> 
     durationMinutes: day.duration_minutes ?? null,
     exercises: (exercises ?? []) as unknown as ExerciseListRow[],
     completedToday,
+    completedExerciseIds,
+    memberId,
   };
 }
 

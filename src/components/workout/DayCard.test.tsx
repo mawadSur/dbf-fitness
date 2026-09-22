@@ -1,7 +1,8 @@
 import { fireEvent, screen } from '@testing-library/react-native';
 
 import type { PlanDay } from '../../features/workouts/planSummary';
-import { BOTH_THEMES, renderInTheme } from '../ui/testing';
+import { TITLE_MAX_LINES } from '../ui/layout';
+import { BOTH_THEMES, mockWindowDimensions, renderInTheme } from '../ui/testing';
 import { DayCard } from './DayCard';
 
 const day: PlanDay = { id: 'd2', dayNumber: 2, blockName: 'Pull', durationMinutes: 40 };
@@ -58,5 +59,30 @@ describe('DayCard', () => {
       scheme,
     );
     expect(screen.getByTestId('card').props.accessibilityRole).toBe('button');
+  });
+
+  describe('a long coach-written block name', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    const longDay: PlanDay = { ...day, blockName: 'Cardio in Place — Foundation & Technique' };
+
+    it('wraps over three lines instead of truncating', async () => {
+      mockWindowDimensions({ fontScale: 1 });
+      await renderInTheme(
+        <DayCard day={longDay} isCompleted={false} isToday onPress={jest.fn()} testID="card" />,
+      );
+      const title = screen.getByText(longDay.blockName);
+      expect(title.props.numberOfLines).toBe(TITLE_MAX_LINES);
+    });
+
+    it('is not clamped at all once the member enlarges text', async () => {
+      mockWindowDimensions({ fontScale: 2 });
+      await renderInTheme(
+        <DayCard day={longDay} isCompleted={false} isToday onPress={jest.fn()} testID="card" />,
+      );
+      const title = screen.getByText(longDay.blockName);
+      expect(title.props.numberOfLines).toBeUndefined();
+      expect(title.props.ellipsizeMode).toBeUndefined();
+    });
   });
 });

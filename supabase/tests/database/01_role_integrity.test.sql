@@ -41,13 +41,19 @@ values
   ('5f1a0000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 's1-stranger@test.invalid', 'x', now(), now()),
   ('5f1a0000-0000-4000-8000-000000000002', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 's1-admin@test.invalid',    'x', now(), now()),
   ('5f1a0000-0000-4000-8000-000000000003', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 's1-coachb@test.invalid',   'x', now(), now()),
-  ('5f1a0000-0000-4000-8000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 's1-memberb@test.invalid',  'x', now(), now());
+  ('5f1a0000-0000-4000-8000-000000000004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 's1-memberb@test.invalid',  'x', now(), now()),
+  ('5f1a0000-0000-4000-8000-000000000008', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 's1-danaspare@test.invalid','x', now(), now());
 
 insert into public.profiles (id, role, coach_id, full_name) values
   ('5f1a0000-0000-4000-8000-000000000001', 'member', null,                                   'S1 Stranger'),
   ('5f1a0000-0000-4000-8000-000000000002', 'admin',  null,                                   'S1 Admin'),
   ('5f1a0000-0000-4000-8000-000000000003', 'coach',  null,                                   'S1 Coach B'),
-  ('5f1a0000-0000-4000-8000-000000000004', 'member', '5f1a0000-0000-4000-8000-000000000003', 'S1 Member B');
+  ('5f1a0000-0000-4000-8000-000000000004', 'member', '5f1a0000-0000-4000-8000-000000000003', 'S1 Member B'),
+  -- A Dana member deliberately left WITHOUT a workout plan. Since 20260921100000
+  -- (plan_integrity) workout_plans is unique per member, so the "coach may create
+  -- a plan for her own member" control below needs a member who has none yet;
+  -- Jordan already owns the seed plan 33333333-….
+  ('5f1a0000-0000-4000-8000-000000000008', 'member', '11111111-1111-1111-1111-111111111111', 'S1 Dana Spare');
 
 -- Coach B's member pays, so any refusal below is about tenancy, never about money.
 insert into public.subscriptions (member_id, status, current_period_end)
@@ -60,13 +66,16 @@ insert into public.live_classes (id, coach_id, title, agora_channel_name, starts
 insert into public.groups (id, name, description, created_by) values
   ('5f1a0000-0000-4000-8000-0000000000b1', 'S1 Coach B Crew', 'Coach B tenant', '5f1a0000-0000-4000-8000-000000000003');
 
--- Workout plans: one in Dana's tenant (Jordan), one in Coach B's tenant.
+-- Workout plans: one in Coach B's tenant. Dana's tenant reuses Jordan's SEED
+-- plan 33333333-… rather than adding a second one: since 20260921100000
+-- (plan_integrity) workout_plans carries unique (member_id), so a member has
+-- exactly one plan. The seed plan already has the tenancy this suite needs
+-- (member Jordan, coach Dana), and its days are numbered 1-3.
 insert into public.workout_plans (id, member_id, coach_id, title) values
-  ('5f1a0000-0000-4000-8000-0000000000e1', '22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'S1 Dana Plan'),
   ('5f1a0000-0000-4000-8000-0000000000e3', '5f1a0000-0000-4000-8000-000000000004', '5f1a0000-0000-4000-8000-000000000003', 'S1 Coach B Plan');
 
 insert into public.workout_days (id, workout_plan_id, day_number, block_name) values
-  ('5f1a0000-0000-4000-8000-0000000000e2', '5f1a0000-0000-4000-8000-0000000000e1', 1, 'S1 Dana Day'),
+  ('5f1a0000-0000-4000-8000-0000000000e2', '33333333-3333-3333-3333-333333333333', 4, 'S1 Dana Day'),
   ('5f1a0000-0000-4000-8000-0000000000e4', '5f1a0000-0000-4000-8000-0000000000e3', 1, 'S1 Coach B Day');
 
 -- Diet plans, same two tenants.
@@ -354,9 +363,11 @@ select throws_ok(
 -- Coaches keep every one of those abilities inside their own tenant.
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
+-- Targets the spare Dana member, not Jordan: workout_plans is unique per member
+-- since 20260921100000 and Jordan already owns the seed plan.
 select lives_ok(
   $$ insert into public.workout_plans (member_id, coach_id, title)
-     values ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111', 'S1 Coach Plan') $$,
+     values ('5f1a0000-0000-4000-8000-000000000008', '11111111-1111-1111-1111-111111111111', 'S1 Coach Plan') $$,
   'T5 control: coach can create a plan for her own member');
 
 select lives_ok(
@@ -498,17 +509,33 @@ with u as (
 select is((select count(*) from u), 0::bigint,
   'auditor: an unrelated coach cannot dismiss another tenant''s abuse report');
 
--- The reporter's own coach can.
+-- 20260921131000 (moderation_admin) narrowed the moderator from "a coach with a
+-- relationship" to the ADMIN only, so the reporter's own coach is now refused
+-- too. The tenancy assertions above still hold; what changed is that being the
+-- reporter's coach is no longer sufficient.
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 select is((select count(*) from public.moderation_reports
+           where id = '5f1a0000-0000-4000-8000-0000000000d2'), 0::bigint,
+  'auditor: the reporter''s coach no longer sees the report (admin-only since 20260921131000)');
+with u as (
+  update public.moderation_reports set status = 'dismissed'
+  where id = '5f1a0000-0000-4000-8000-0000000000d2' returning 1
+)
+select is((select count(*) from u), 0::bigint,
+  'auditor: the reporter''s coach no longer actions the report');
+
+-- Positive control, so the refusals above cannot pass just because the row is
+-- unreachable: the admin still reads and actions it.
+select set_config('request.jwt.claim.sub', '5f1a0000-0000-4000-8000-000000000002', true);
+select is((select count(*) from public.moderation_reports
            where id = '5f1a0000-0000-4000-8000-0000000000d2'), 1::bigint,
-  'auditor control: the reporter''s coach still sees the report');
+  'auditor control: the admin sees the report');
 with u as (
   update public.moderation_reports set status = 'dismissed'
   where id = '5f1a0000-0000-4000-8000-0000000000d2' returning 1
 )
 select is((select count(*) from u), 1::bigint,
-  'auditor control: the reporter''s coach can still action the report');
+  'auditor control: the admin can action the report');
 
 -- A moderator may not close a report filed against themselves.
 set local role postgres;
@@ -918,8 +945,14 @@ values ('5f1a0000-0000-4000-8000-0000000000a3'::uuid, 'S1 R2 Member Group', 'own
 -- ---------------------------------------------------------------------------
 select hasnt_index('public', 'workout_completions', 'workout_completions_member_day_key',
   'R2-1: the lifetime (member, day) unique key is gone');
-select has_index('public', 'workout_completions', 'workout_completions_member_day_date_key',
-  'R2-1: replaced by a per-UTC-calendar-date unique key');
+-- 20260921112000 (timezone_local_dates) re-keyed this from the UTC calendar date
+-- to the member's LOCAL calendar date. The per-day cap is unchanged in strength;
+-- only the date it buckets on moved, so the old name must be gone and the new
+-- one present.
+select hasnt_index('public', 'workout_completions', 'workout_completions_member_day_date_key',
+  'R2-1: the UTC-calendar-date unique key is gone');
+select has_index('public', 'workout_completions', 'workout_completions_member_day_local_key',
+  'R2-1: replaced by a per-LOCAL-calendar-date unique key');
 
 -- The same day on three different dates is the whole point: streaks need it.
 -- (An earlier section of this suite already logged Jordan/e2 for TODAY, so these
@@ -1233,10 +1266,11 @@ values (gen_random_uuid(), 'recordings',
         '5f1a0000-0000-4000-8000-000000000006');
 
 -- A completion Jordan owns, on a day of its own inside Dana's plan, so it cannot
--- collide with workout_completions_member_day_date_key (one row per member, per day,
--- per UTC date) against the completions the earlier blocks created.
+-- collide with workout_completions_member_day_local_key (one row per member, per
+-- day, per LOCAL date since 20260921112000) against the completions the earlier
+-- blocks created.
 insert into public.workout_days (id, workout_plan_id, day_number, block_name) values
-  ('5f1a0000-0000-4000-8000-000000000e30', '5f1a0000-0000-4000-8000-0000000000e1', 2, 'S1 R3 Day');
+  ('5f1a0000-0000-4000-8000-000000000e30', '33333333-3333-3333-3333-333333333333', 5, 'S1 R3 Day');
 
 insert into public.workout_completions (id, member_id, workout_day_id, status, completed_at)
 values ('5f1a0000-0000-4000-8000-0000000000c1', '22222222-2222-2222-2222-222222222222',

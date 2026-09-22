@@ -1,7 +1,8 @@
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 
 import { staffLinks, type ProfileRole } from '../../features/workouts/homeState';
 import { Eyebrow, Heading, HeroPanel, ListRow, SectionHeader, Text } from '../ui';
+import { titleLines } from '../ui/layout';
 
 export type StaffHomeProps = {
   role: Extract<ProfileRole, 'coach' | 'admin'>;
@@ -20,13 +21,14 @@ export type StaffHomeProps = {
  */
 export function StaffHome({ role, greetingText, onOpen, testID = 'staff-home' }: StaffHomeProps) {
   const links = staffLinks(role);
+  const { fontScale } = useWindowDimensions();
 
   return (
     <View style={{ gap: 24 }} testID={testID}>
       <HeroPanel padding={24}>
         <View style={{ gap: 4 }}>
           <Eyebrow>DBF coaching</Eyebrow>
-          <Heading level={1} numberOfLines={2}>
+          <Heading level={1} numberOfLines={titleLines(fontScale)}>
             {greetingText}
           </Heading>
           <Text tone="secondary">Pick up where your members left off.</Text>

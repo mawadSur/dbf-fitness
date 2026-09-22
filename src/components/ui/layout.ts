@@ -363,6 +363,42 @@ export function tabBarLabelFits(
   );
 }
 
+/* --------------------------------------------------------------- titles ---- */
+
+/**
+ * Lines a TITLE may wrap onto before it is allowed to tail-truncate.
+ *
+ * Two was not enough. A workout block is named by its coach, and the real
+ * plans carry names like "Cardio in Place — Foundation & Technique": at the h1
+ * size, on a 390pt phone, that is three lines, so the day screen's header read
+ * "Cardio in Place — Foundation & …" and the member could not see which block
+ * they had opened. A title is the one string on a screen that must never be
+ * cut — everything else on the page is understood relative to it.
+ */
+export const TITLE_MAX_LINES = 3;
+
+/**
+ * The OS text size from which a title stops being clamped at all.
+ *
+ * A fixed line budget is a size budget in disguise: three lines of an h1 at
+ * 100% is roughly one line at 300%, so keeping the clamp would reintroduce the
+ * very truncation it exists to prevent for exactly the members who enlarged
+ * the text. Past this point the title is allowed to be as tall as it needs —
+ * the screen scrolls, and a tall heading is never as bad as a cut one.
+ *
+ * 1.3 is the same threshold the app already uses to stack rows (§9).
+ */
+export const TITLE_UNCLAMP_FONT_SCALE = 1.3;
+
+/**
+ * `numberOfLines` for a title at this OS text size: `TITLE_MAX_LINES`
+ * normally, and `undefined` (no clamp, no ellipsis) once text is enlarged.
+ */
+export function titleLines(fontScale: number): number | undefined {
+  if (!Number.isFinite(fontScale)) return TITLE_MAX_LINES;
+  return fontScale >= TITLE_UNCLAMP_FONT_SCALE ? undefined : TITLE_MAX_LINES;
+}
+
 /* --------------------------------------------------------------- motion ---- */
 
 export type PressFeedback = { opacity: number; transform: { scale: number }[] };

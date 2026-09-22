@@ -18,6 +18,16 @@ export type ChecklistRowProps = {
   /** Optional details affordance; omit it and no button is exposed. */
   onPress?: () => void;
   disabled?: boolean;
+  /**
+   * Locks the CHECKBOX only, leaving the details affordance live and the row
+   * at full contrast.
+   *
+   * For a row whose checked state is a finished record rather than something
+   * still being decided — a workout already logged for today. `disabled` would
+   * be wrong there twice over: it also shuts the exercise itself, and it fades
+   * the row to 45%, which says "unavailable" about work the member has done.
+   */
+  toggleDisabled?: boolean;
   style?: StyleProp<ViewStyle>;
   testID?: string;
 };
@@ -36,10 +46,12 @@ export function ChecklistRow({
   onToggle,
   onPress,
   disabled = false,
+  toggleDisabled = false,
   style,
   testID,
 }: ChecklistRowProps) {
   const { colors, tokens } = useOptionalTheme();
+  const noToggle = disabled || toggleDisabled;
 
   return (
     <View
@@ -60,14 +72,14 @@ export function ChecklistRow({
       ]}
     >
       <PressableBase
-        onPress={disabled ? undefined : onToggle}
-        disabled={disabled}
+        onPress={noToggle ? undefined : onToggle}
+        disabled={noToggle}
         accessibilityRole="checkbox"
         accessibilityLabel={label}
-        accessibilityState={{ checked, disabled }}
-        android_ripple={disabled ? undefined : { color: rippleFor(colors.text), borderless: true }}
+        accessibilityState={{ checked, disabled: noToggle }}
+        android_ripple={noToggle ? undefined : { color: rippleFor(colors.text), borderless: true }}
         // Layout NEVER goes in a style callback — see `PressableBase`.
-        pressFeedback={disabled ? 'none' : 'ds'}
+        pressFeedback={noToggle ? 'none' : 'ds'}
         style={{
           width: CHECK_TARGET_SIZE,
           height: CHECK_TARGET_SIZE,

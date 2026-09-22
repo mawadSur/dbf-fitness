@@ -551,7 +551,9 @@ describe('Workout day and exercise error states', () => {
     setTable('exercises', () =>
       ok([{ id: 'e1', name: 'Bench', reps_or_duration: '5x5', order_index: 1 }])
     );
-    setTable('workout_completions', () => ok({ id: 'comp-1' }));
+    // The day is NOT logged yet (select), and the legacy insert path returns
+    // the new completion row the exercise ticks are attached to.
+    setTable('workout_completions', (ops) => (ops.method === 'insert' ? ok({ id: 'comp-1' }) : ok(null)));
     setTable('exercise_completions', () => ok(null));
     // No setRpc: the fake answers PGRST202 exactly like PostgREST does.
     await renderScreen(<WorkoutDayScreen />);
@@ -572,7 +574,8 @@ describe('Workout day and exercise error states', () => {
     setTable('exercises', () =>
       ok([{ id: 'e1', name: 'Bench', reps_or_duration: '5x5', order_index: 1 }])
     );
-    setTable('workout_completions', () => ({ data: null, error: null, count: 1 }));
+    setTable('workout_completions', () => ok({ id: 'comp-1' }));
+    setTable('exercise_completions', () => ok([{ exercise_id: 'e1' }]));
     await renderScreen(<WorkoutDayScreen />);
 
     const button = await screen.findByRole('button', { name: 'Logged for today' });
@@ -584,6 +587,49 @@ describe('Workout day and exercise error states', () => {
     expect(fakeCalls.some((c) => c.table === 'workout_completions' && c.method === 'insert')).toBe(
       false
     );
+  });
+
+  /**
+   * The screen used to keep its ticks in `useState` alone, so re-opening a day
+   * that was already logged showed "0 of 1 done" with an empty checkbox above
+   * a footer that said "Logged for today". The ticks are now hydrated from the
+   * completion's `exercise_completions`.
+   */
+  it('day screen shows a logged day as done, hydrated from the saved completion', async () => {
+    mockParams = { dayId: 'd1' };
+    setTable('workout_days', () => ok({ day_number: 1, block_name: 'Push' }));
+    setTable('exercises', () =>
+      ok([
+        { id: 'e1', name: 'Bench', reps_or_duration: '5x5', order_index: 1 },
+        { id: 'e2', name: 'Row', reps_or_duration: '10', order_index: 2 },
+      ])
+    );
+    setTable('workout_completions', () => ok({ id: 'comp-1' }));
+    setTable('exercise_completions', () => ok([{ exercise_id: 'e1' }, { exercise_id: 'e2' }]));
+    await renderScreen(<WorkoutDayScreen />);
+
+    expect(await screen.findByText('2 of 2 done')).toBeTruthy();
+    const bench = screen.getByRole('checkbox', { name: 'Bench' });
+    expect(bench.props.accessibilityState).toMatchObject({ checked: true, disabled: true });
+
+    // The boxes report the record; they are not an edit control any more.
+    await fireEvent.press(bench);
+    expect(screen.getByText('2 of 2 done')).toBeTruthy();
+  });
+
+  it('day screen counts only the logged exercises still in the day', async () => {
+    mockParams = { dayId: 'd1' };
+    setTable('workout_days', () => ok({ day_number: 1, block_name: 'Push' }));
+    setTable('exercises', () =>
+      ok([{ id: 'e1', name: 'Bench', reps_or_duration: '5x5', order_index: 1 }])
+    );
+    setTable('workout_completions', () => ok({ id: 'comp-1' }));
+    // 'e9' was archived by the coach since: its completion row survives, the
+    // exercise does not render, and counting it would read "2 of 1 done".
+    setTable('exercise_completions', () => ok([{ exercise_id: 'e1' }, { exercise_id: 'e9' }]));
+    await renderScreen(<WorkoutDayScreen />);
+
+    expect(await screen.findByText('1 of 1 done')).toBeTruthy();
   });
 
   /**

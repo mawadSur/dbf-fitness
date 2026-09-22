@@ -61,6 +61,8 @@ export {
   TAB_BAR_MAX_LABEL_LINES,
   TAB_BAR_MIN_HEIGHT,
   TAB_BAR_VERTICAL_PADDING,
+  TITLE_MAX_LINES,
+  TITLE_UNCLAMP_FONT_SCALE,
   bottomInsetPadding,
   clampFontScale,
   clampLabelFontScale,
@@ -86,6 +88,7 @@ export {
   tabBarLabelLines,
   tabBarLabelWidth,
   textAdvanceEm,
+  titleLines,
   widestLabel,
   wrapLabel,
   type ButtonSize,
@@ -99,7 +102,13 @@ export {
   useDelayedReveal,
   type LoadingSkeletonProps,
 } from './LoadingSkeleton';
-export { Logo, LOGO_ASPECT_RATIO, LOGO_BADGE_RADIUS, type LogoProps } from './Logo';
+export {
+  Logo,
+  LOGO_ASPECT_RATIO,
+  LOGO_BADGE_PADDING,
+  LOGO_BADGE_RADIUS,
+  type LogoProps,
+} from './Logo';
 export {
   MilestoneBadge,
   MILESTONE_MEDALLION_SIZE,

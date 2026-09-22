@@ -1,7 +1,13 @@
 import { fireEvent, screen } from '@testing-library/react-native';
 
 import type { PlanDay } from '../../features/workouts/planSummary';
-import { BOTH_THEMES, INCLUDING_HIDDEN, renderInTheme } from '../ui/testing';
+import { TITLE_MAX_LINES } from '../ui/layout';
+import {
+  BOTH_THEMES,
+  INCLUDING_HIDDEN,
+  mockWindowDimensions,
+  renderInTheme,
+} from '../ui/testing';
 import { HomePrimaryCard } from './HomePrimaryCard';
 
 const day: PlanDay = { id: 'd3', dayNumber: 3, blockName: 'Lower body', durationMinutes: 42 };
@@ -98,5 +104,26 @@ describe('HomePrimaryCard', () => {
       scheme,
     );
     expect(screen.getByRole('button', { name: 'Start Day 3' })).toBeTruthy();
+  });
+
+  describe('the hero title is a coach-written block name', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    const longDay: PlanDay = { ...day, blockName: 'Cardio in Place — Foundation & Technique' };
+
+    it.each([
+      [1, TITLE_MAX_LINES],
+      [2, undefined],
+    ])('wraps rather than truncating at font scale %s', async (fontScale, expected) => {
+      mockWindowDimensions({ fontScale });
+      await renderInTheme(
+        <HomePrimaryCard
+          primary={{ kind: 'next-day', day: longDay, completedCount: 0, totalDays: 12 }}
+          onStartDay={jest.fn()}
+          onPickCoach={jest.fn()}
+        />,
+      );
+      expect(screen.getByText(longDay.blockName).props.numberOfLines).toBe(expected);
+    });
   });
 });

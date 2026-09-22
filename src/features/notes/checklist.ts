@@ -6,6 +6,7 @@ import {
   type NoteChecklistItem,
   type NoteChecklistItemKind,
 } from '../../services/transcription/types';
+import { prescriptionLabel } from './itemPrescription';
 
 export type EditorState = {
   title: string;
@@ -158,11 +159,15 @@ export function parseStoredChecklist(text: string | null | undefined): NoteCheck
   }
 }
 
+/**
+ * The "4 sets × 8-10 reps" line under an item.
+ *
+ * The unit comes from `prescriptionLabel`, which reads it off the value: this
+ * used to append "reps" to everything, so a dictated hold rendered as
+ * "3 sets × 30s reps".
+ */
 export function itemSublabel(item: NoteChecklistItem): string | null {
-  const parts: string[] = [];
-  if (item.sets !== undefined) parts.push(`${item.sets} ${item.sets === 1 ? 'set' : 'sets'}`);
-  if (item.reps) parts.push(`${item.reps} reps`);
-  return parts.length > 0 ? parts.join(' × ') : null;
+  return prescriptionLabel(item);
 }
 
 /** Editor state for a draft: its checklist, or an empty one titled after the class. */

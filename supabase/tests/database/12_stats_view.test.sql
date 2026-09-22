@@ -317,16 +317,18 @@ select ok((select 'security_invoker=true' = any (reloptions)
              from pg_class where relname = 'member_workout_stats'),
           'member_workout_stats is security_invoker (RLS follows the caller)');            -- 53
 
--- The same UTC-day bucketing is enforced at the storage layer too: one member
--- cannot log the same workout_day twice inside one UTC day, which is what keeps
--- completed_count from being inflatable by replaying a request.
+-- The same day bucketing is enforced at the storage layer too: one member cannot
+-- log the same workout_day twice inside one calendar day, which is what keeps
+-- completed_count from being inflatable by replaying a request. 20260921112000
+-- (timezone_local_dates) moved the bucket from the UTC date to the member's
+-- LOCAL date; the cap itself is unchanged.
 select throws_ok(
   $$insert into public.workout_completions (member_id, workout_day_id, status, effort_score, completed_at)
     values ('7a120000-0000-4000-8000-000000000002', '7a120000-0000-4000-8000-0000000000d1',
             'completed', 5, current_date::timestamptz + interval '20 hours')$$,
   '23505',
-  'duplicate key value violates unique constraint "workout_completions_member_day_date_key"',
-  'a member cannot log the same workout_day twice in one UTC day');                        -- 54
+  'duplicate key value violates unique constraint "workout_completions_member_day_local_key"',
+  'a member cannot log the same workout_day twice in one local day');                      -- 54
 
 select * from finish();
 

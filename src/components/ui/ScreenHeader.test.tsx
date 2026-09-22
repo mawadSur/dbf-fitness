@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 import { motion, type ThemeName } from '../../theme/tokens';
 import { Button } from './Button';
-import { minTouchTarget, screenGutter } from './layout';
+import { minTouchTarget, screenGutter, TITLE_MAX_LINES } from './layout';
 import { ScreenHeader } from './ScreenHeader';
 import { ScreenShell } from './ScreenShell';
 import { ScreenShellContext, type ScreenShellState } from './ScreenShellContext';
@@ -49,11 +49,27 @@ describe('ScreenHeader', () => {
     expect(screen.getAllByText(/./)).toHaveLength(1);
   });
 
-  it('keeps a very long title readable instead of letting it run off screen', async () => {
+  // A coach-written block name ("Cardio in Place — Foundation & Technique") is
+  // three h1 lines on a 390pt phone: at two the day screen's header read
+  // "Cardio in Place — Foundation & …" and hid which block the member opened.
+  it('lets a long title wrap over three lines rather than truncating it', async () => {
+    // jest-expo's default Dimensions mock reports fontScale 2, which is the
+    // unclamped branch — this test is about the ordinary text size.
+    mockWindowDimensions({ fontScale: 1 });
     await renderWithInsets(
-      <ScreenHeader title="An extremely long screen title that would never fit" testID="header" />,
+      <ScreenHeader title="Cardio in Place — Foundation & Technique" testID="header" />,
     );
-    expect(screen.getByText(/extremely long screen title/).props.numberOfLines).toBe(2);
+    expect(screen.getByText(/Cardio in Place/).props.numberOfLines).toBe(TITLE_MAX_LINES);
+  });
+
+  it('drops the line clamp entirely once the member enlarges text', async () => {
+    mockWindowDimensions({ fontScale: 2 });
+    await renderWithInsets(
+      <ScreenHeader title="Cardio in Place — Foundation & Technique" testID="header" />,
+    );
+    const title = screen.getByText(/Cardio in Place/);
+    expect(title.props.numberOfLines).toBeUndefined();
+    expect(title.props.ellipsizeMode).toBeUndefined();
   });
 
   describe('safe area', () => {

@@ -12,6 +12,8 @@ import {
   TAB_BAR_LABEL_MAX_FONT_SCALE,
   TAB_BAR_MAX_LABEL_LINES,
   TAB_BAR_MIN_HEIGHT,
+  TITLE_MAX_LINES,
+  TITLE_UNCLAMP_FONT_SCALE,
   bottomInsetPadding,
   clampFontScale,
   clampLabelFontScale,
@@ -37,6 +39,7 @@ import {
   tabBarLabelLines,
   tabBarLabelWidth,
   textAdvanceEm,
+  titleLines,
   widestLabel,
   wrapLabel,
 } from './layout';
@@ -370,6 +373,28 @@ describe('press feedback', () => {
   it('collapses every duration to 0 under reduced motion', () => {
     expect(duration(motion.progressRing, false)).toBe(motion.progressRing);
     expect(duration(motion.progressRing, true)).toBe(0);
+  });
+});
+
+describe('title line clamp', () => {
+  it('gives a title three lines at every normal text size', () => {
+    expect(TITLE_MAX_LINES).toBe(3);
+    expect(titleLines(1)).toBe(TITLE_MAX_LINES);
+    expect(titleLines(1.1)).toBe(TITLE_MAX_LINES);
+    expect(titleLines(1.29)).toBe(TITLE_MAX_LINES);
+  });
+
+  it('removes the clamp from the enlarged-text threshold upwards', () => {
+    expect(titleLines(TITLE_UNCLAMP_FONT_SCALE)).toBeUndefined();
+    expect(titleLines(1.5)).toBeUndefined();
+    expect(titleLines(2)).toBeUndefined();
+    expect(titleLines(3)).toBeUndefined();
+  });
+
+  it('falls back to the clamp rather than unclamping on nonsense input', () => {
+    expect(titleLines(Number.NaN)).toBe(TITLE_MAX_LINES);
+    expect(titleLines(Number.POSITIVE_INFINITY)).toBe(TITLE_MAX_LINES);
+    expect(titleLines(0)).toBe(TITLE_MAX_LINES);
   });
 });
 

@@ -25,6 +25,7 @@ import {
 import { finishWorkout, newClientRequestId } from '../../../src/features/workouts/finishWorkout';
 import { checklistProgress, durationCopy } from '../../../src/features/workouts/planSummary';
 import { fetchWorkoutDay } from '../../../src/features/workouts/queries';
+import { useExerciseTicks } from '../../../src/features/workouts/useExerciseTicks';
 import { useDelayedVisible } from '../../../src/components/ui/useDelayedVisible';
 import type { ExerciseListRow } from '../../../src/types/exercise';
 
@@ -33,7 +34,6 @@ export default function WorkoutDayScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [justFinished, setJustFinished] = useState(false);
   const [alreadyLoggedFromServer, setAlreadyLoggedFromServer] = useState(false);
   // One id for the whole mount: tapping Finish again after a timeout is the
@@ -47,6 +47,23 @@ export default function WorkoutDayScreen() {
   });
 
   const showSkeleton = useDelayedVisible(isLoading);
+
+  // The server has today's row — on load, or as the idempotent answer to this
+  // tap. Computed before the ticks because it is what decides whether they are
+  // a record of what was done or a draft of what is being done.
+  const loggedOnServer = !!data?.completedToday || alreadyLoggedFromServer;
+
+  const exercises = data?.exercises;
+  const visibleIds = useMemo(() => (exercises ?? []).map((row) => row.id), [exercises]);
+
+  const { checkedIds, locked, toggle, discardDraft } = useExerciseTicks({
+    memberId: data?.memberId ?? null,
+    dayId: dayId ?? null,
+    visibleIds,
+    ready: !!data,
+    alreadyLogged: loggedOnServer,
+    completedExerciseIds: data?.completedExerciseIds ?? EMPTY_IDS,
+  });
 
   const finishMutation = useMutation({
     mutationFn: () =>
@@ -68,17 +85,10 @@ export default function WorkoutDayScreen() {
       // That is not a celebration, so it takes the already-logged branch.
       if (result.alreadyLogged) setAlreadyLoggedFromServer(true);
       else setJustFinished(true);
+      // The day is recorded; the local draft has nothing left to remember.
+      discardDraft();
     },
   });
-
-  const toggleExercise = useCallback((exerciseId: string) => {
-    setCheckedIds((current) => {
-      const next = new Set(current);
-      if (next.has(exerciseId)) next.delete(exerciseId);
-      else next.add(exerciseId);
-      return next;
-    });
-  }, []);
 
   const openExercise = useCallback(
     (exerciseId: string) => router.push(`/workout/exercise/${exerciseId}`),
@@ -101,11 +111,14 @@ export default function WorkoutDayScreen() {
         repsOrDuration={item.reps_or_duration}
         imageKey={item.image_key}
         checked={checkedIds.has(item.id)}
-        onToggle={() => toggleExercise(item.id)}
+        // A logged day reports what was done; the box is not an edit control
+        // any more, but the exercise itself stays open to read.
+        toggleDisabled={locked}
+        onToggle={() => toggle(item.id)}
         onPress={() => openExercise(item.id)}
       />
     ),
-    [checkedIds, openExercise, toggleExercise],
+    [checkedIds, locked, openExercise, toggle],
   );
 
   const checkedInDay = useMemo(
@@ -146,10 +159,10 @@ export default function WorkoutDayScreen() {
     );
   }
 
-  // The server already had today's row (on load, or as the idempotent answer to
-  // this tap), or the legacy insert path hit the 23505.
+  // `loggedOnServer`, plus the legacy insert path's 23505 — which is a footer
+  // message only: that error leaves the ticks on screen as the member left them.
   const alreadyLoggedToday =
-    data.completedToday || alreadyLoggedFromServer || isAlreadyLoggedTodayError(finishMutation.error);
+    loggedOnServer || isAlreadyLoggedTodayError(finishMutation.error);
   const duration = durationCopy(data.durationMinutes);
 
   return (
@@ -220,3 +233,6 @@ export default function WorkoutDayScreen() {
 
 const keyExtractor = (exercise: ExerciseListRow) => exercise.id;
 const Separator = () => <View style={{ height: 12 }} />;
+
+/** Stable empty default, so the ticks hook is not handed a new array each render. */
+const EMPTY_IDS: readonly string[] = [];
