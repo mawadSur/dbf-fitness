@@ -6,6 +6,7 @@ import { RefreshControl, ScrollView, View } from 'react-native';
 import { AppearanceSection } from '../../src/components/account/AppearanceSection';
 import { DangerZone } from '../../src/components/account/DangerZone';
 import { IdentityHeader } from '../../src/components/account/IdentityHeader';
+import { LegalSection } from '../../src/components/account/LegalSection';
 import { LoadingSkeleton } from '../../src/components/ui/LoadingSkeleton';
 import { CurrentCoachCard } from '../../src/components/coaching/CoachCard';
 import { ErrorBlock } from '../../src/components/coaching/StateBlock';
@@ -182,6 +183,8 @@ export default function ProfileScreen() {
             />
           </View>
         </Section>
+
+        <LegalSection />
 
         {/* Danger zone — in-app account deletion (Apple guideline 5.1.1(v)). It stays collapsed and
             inert until tapped, and only renders once the account (and therefore the role) is known. */}

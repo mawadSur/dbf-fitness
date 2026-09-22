@@ -13,8 +13,11 @@ import { CoachClassControls } from '../../../../src/components/live/CoachClassCo
 import { GraceBanner, GraceNotice } from '../../../../src/components/live/GraceNotice';
 import { LiveStage } from '../../../../src/components/live/LiveStage';
 import { SubscriptionBlockedPanel } from '../../../../src/components/live/SubscriptionBlockedPanel';
+import { ParticipantModeration } from '../../../../src/features/moderation/ParticipantModeration';
+import { pushDisabledNotice } from '../../../../src/services/push';
 import {
   Badge,
+  Banner,
   Card,
   CONTENT_MAX_WIDTH,
   EmptyState,
@@ -190,6 +193,9 @@ export default function LiveClassScreen() {
     }
   };
 
+  // Read at render, not at module load: a test (and the dev gallery) can flip the env var.
+  const pushNotice = pushDisabledNotice();
+
   const localTile = session.tiles.find((tile) => tile.isLocal);
   // The shell caps its column at 640 and pays the gutter, so the stage gets exactly that width.
   const contentWidth = computeContentWidth(windowWidth, CONTENT_MAX_WIDTH, screenGutter(windowWidth));
@@ -239,6 +245,22 @@ export default function LiveClassScreen() {
         </Card>
       )}
 
+      {/* PRODUCTION GUARD, visible half (ticket item 7). `pushDisabledNotice()` was
+          implemented and unit-tested but rendered nowhere, so a release build with
+          EXPO_PUBLIC_REAL_PUSH unset silently used the no-op push adapter while the member
+          went on believing a "class starting soon" alert would arrive. Placed ABOVE the
+          in-call / not-in-call fork on purpose: the person who needs to know reminders are
+          dead is the one reading the schedule, not the one already in the call. Returns null
+          in __DEV__ and on web, so this costs a healthy build nothing. */}
+      {pushNotice ? (
+        <Banner
+          tone="warning"
+          title="Class reminders are off"
+          message={pushNotice}
+          testID="push-disabled-notice"
+        />
+      ) : null}
+
       {inCall ? (
         <View style={{ gap: 16 }}>
           {graceInfo ? <GraceBanner info={graceInfo} /> : null}
@@ -252,6 +274,14 @@ export default function LiveClassScreen() {
           <ClassPresenceList
             entries={presence.participants}
             unavailable={presence.unavailable}
+            currentUserId={member?.id ?? null}
+          />
+
+          {/* Apple guideline 1.2: report and block must be reachable wherever other users
+              appear, so the live class gets the same two actions as the community roster
+              (same ReportPanel, same blocks table). Renders nothing when nobody else is here. */}
+          <ParticipantModeration
+            participants={presence.participants}
             currentUserId={member?.id ?? null}
           />
         </View>

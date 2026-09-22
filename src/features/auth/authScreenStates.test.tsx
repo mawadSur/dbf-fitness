@@ -16,6 +16,7 @@ const mockPush = jest.fn();
 const mockSignIn = jest.fn();
 const mockSignUp = jest.fn();
 const mockUpsert = jest.fn();
+const mockRpc = jest.fn().mockResolvedValue({ data: null, error: null });
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -34,6 +35,10 @@ jest.mock('../../services/supabase/client', () => ({
       signUp: (...args: unknown[]) => mockSignUp(...args),
     },
     from: () => ({ upsert: (...args: unknown[]) => mockUpsert(...args) }),
+    // Sign-up records the terms agreement via rpc('accept_terms'). Omitting it here made
+    // that call throw into sign-up's non-fatal catch, so the suite passed while logging
+    // "_client.supabase.rpc is not a function" — a green test over a broken call.
+    rpc: (...args: unknown[]) => mockRpc(...args),
   },
 }));
 
@@ -54,6 +59,8 @@ async function fillSignIn(email: string, password: string) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockUpsert.mockResolvedValue({ error: null });
+  // clearAllMocks drops the default implementation too, so restore it here.
+  mockRpc.mockResolvedValue({ data: null, error: null });
 });
 
 describe('sign-in: idle', () => {
@@ -200,6 +207,9 @@ describe('sign-up: idle, invalid, pending, offline', () => {
     await fireEvent.changeText(screen.getByLabelText('Full name'), 'Ada Lovelace');
     await fireEvent.changeText(screen.getByLabelText('Email'), 'ada@example.test');
     await fireEvent.changeText(screen.getByLabelText('Password'), 'short');
+    // Guideline 1.2: submit stays disabled until the terms box is ticked, so every
+    // sign-up path in these tests has to agree first.
+    await fireEvent.press(screen.getByTestId('sign-up-terms'));
     await fireEvent.press(screen.getByTestId('sign-up-submit'));
 
     expect(screen.getByTestId('sign-up-password-message')).toHaveTextContent(
@@ -216,6 +226,7 @@ describe('sign-up: idle, invalid, pending, offline', () => {
     await fireEvent.changeText(screen.getByLabelText('Full name'), 'Ada Lovelace');
     await fireEvent.changeText(screen.getByLabelText('Email'), 'ada@example.test');
     await fireEvent.changeText(screen.getByLabelText('Password'), 'password123');
+    await fireEvent.press(screen.getByTestId('sign-up-terms'));
     fireEvent.press(screen.getByTestId('sign-up-submit'));
 
     await waitFor(() =>

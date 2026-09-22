@@ -2,7 +2,8 @@ import { View } from 'react-native';
 
 import { graceReminderCopy, type SubscriptionInfo } from '../../features/subscriptions/state';
 import { Banner, Button, Text } from '../ui';
-import { billingUrl, CONTACT_COACH_TO_RENEW, openBilling } from './billing';
+import { billingUrl, MANAGED_BY_DBF, openBilling } from './billing';
+import { MembershipSupportLink } from './MembershipSupportLink';
 
 /** Payment-overdue reminder for a member in the grace window. Access continues; this only nags. */
 export function GraceBanner({ info }: { info: SubscriptionInfo }) {
@@ -15,9 +16,12 @@ export function GraceBanner({ info }: { info: SubscriptionInfo }) {
       {hasBilling ? (
         <Button label="Renew now" variant="secondary" onPress={() => void openBilling()} fullWidth />
       ) : (
-        <Text role="labelSm" tone="secondary">
-          {CONTACT_COACH_TO_RENEW}
-        </Text>
+        <View style={{ gap: 8 }}>
+          <Text role="labelSm" tone="secondary">
+            {MANAGED_BY_DBF}
+          </Text>
+          <MembershipSupportLink />
+        </View>
       )}
     </View>
   );

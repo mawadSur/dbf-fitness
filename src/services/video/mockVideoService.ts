@@ -6,7 +6,9 @@ import type { VideoParticipant, VideoService, VideoSession } from './types';
  * local participant with a labelled placeholder tile so join/leave/mute UI is
  * fully testable — including headless — without AGORA_APP_ID.
  */
-export function createMockVideoService(): VideoService {
+export const MOCK_PLACEHOLDER_LABEL = 'Camera preview (mock)';
+
+export function createMockVideoService(placeholderLabel: string = MOCK_PLACEHOLDER_LABEL): VideoService {
   let session: VideoSession | null = null;
   let listeners: ((participants: VideoParticipant[]) => void)[] = [];
 
@@ -25,7 +27,7 @@ export function createMockVideoService(): VideoService {
             isLocal: true,
             isMuted: false,
             isCameraOff: false,
-            placeholderLabel: 'Camera preview (mock)',
+            placeholderLabel,
           },
         ],
       };

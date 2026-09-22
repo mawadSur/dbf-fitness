@@ -326,3 +326,57 @@ describe('live class screen states', () => {
     expect(mockBack).toHaveBeenCalled();
   });
 });
+
+/**
+ * The VISIBLE half of the push production guard (ticket item 7).
+ *
+ * `pushDisabledNotice()` was implemented and unit-tested but rendered nowhere, so a release
+ * build with EXPO_PUBLIC_REAL_PUSH unset used the no-op adapter in silence and the member
+ * kept believing a "class starting soon" alert was coming. These two tests are what stops
+ * that regressing: the unit test alone passed the whole time the notice was invisible.
+ */
+describe('live class screen: reminders-off notice', () => {
+  const globals = globalThis as unknown as { __DEV__: boolean };
+  const OLD_FLAG = process.env.EXPO_PUBLIC_REAL_PUSH;
+  const OLD_DEV = globals.__DEV__;
+
+  afterEach(() => {
+    if (OLD_FLAG === undefined) delete process.env.EXPO_PUBLIC_REAL_PUSH;
+    else process.env.EXPO_PUBLIC_REAL_PUSH = OLD_FLAG;
+    globals.__DEV__ = OLD_DEV;
+  });
+
+  it('tells the member reminders are off in a release build that has no real push', async () => {
+    delete process.env.EXPO_PUBLIC_REAL_PUSH;
+    globals.__DEV__ = false;
+    (fetchLiveClass as jest.Mock).mockResolvedValue(liveClass());
+
+    await renderWithQuery(<ClassScreen />);
+
+    const notice = await screen.findByTestId('push-disabled-notice');
+    expect(notice).toBeTruthy();
+    expect(screen.getByText(/Class reminders are turned off in this build/)).toBeTruthy();
+  });
+
+  it('stays out of the way in __DEV__, where the no-op adapter is expected', async () => {
+    delete process.env.EXPO_PUBLIC_REAL_PUSH;
+    globals.__DEV__ = true;
+    (fetchLiveClass as jest.Mock).mockResolvedValue(liveClass());
+
+    await renderWithQuery(<ClassScreen />);
+
+    await screen.findByTestId('class-summary');
+    expect(screen.queryByTestId('push-disabled-notice')).toBeNull();
+  });
+
+  it('stays out of the way when real push is switched on', async () => {
+    process.env.EXPO_PUBLIC_REAL_PUSH = 'true';
+    globals.__DEV__ = false;
+    (fetchLiveClass as jest.Mock).mockResolvedValue(liveClass());
+
+    await renderWithQuery(<ClassScreen />);
+
+    await screen.findByTestId('class-summary');
+    expect(screen.queryByTestId('push-disabled-notice')).toBeNull();
+  });
+});

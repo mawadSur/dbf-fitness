@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Keyboard, View, type TextInput } from 'react-native';
 
 import { AuthAlert, AuthBrandHeader, AuthField, AuthSwitchLink } from '../../src/components/auth';
+import { LegalFooter } from '../../src/components/legal/LegalTextLink';
 import { Button, ScreenShell } from '../../src/components/ui';
 import {
   describeSignInError,
@@ -144,6 +145,9 @@ export default function SignInScreen() {
           action="Create account"
           href="/sign-up"
         />
+
+        {/* Both stores expect the privacy policy to be reachable before an account exists. */}
+        <LegalFooter testID="sign-in-legal-footer" />
       </View>
     </ScreenShell>
   );

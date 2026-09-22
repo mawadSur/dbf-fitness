@@ -177,6 +177,7 @@ describe('SignUpScreen', () => {
     await fireEvent.changeText(screen.getByLabelText('Full name'), 'Ada Lovelace');
     await fireEvent.changeText(screen.getByLabelText('Email'), 'ada@b.co');
     await fireEvent.changeText(screen.getByLabelText('Password'), 'secret12');
+    await fireEvent.press(screen.getByTestId('sign-up-terms'));
     await fireEvent.press(screen.getByRole('button', { name: 'Create account' }));
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'));
@@ -203,6 +204,7 @@ describe('SignUpScreen', () => {
     await fireEvent.changeText(screen.getByLabelText('Full name'), 'Ada');
     await fireEvent.changeText(screen.getByLabelText('Email'), 'ada@b.co');
     await fireEvent.changeText(screen.getByLabelText('Password'), 'secret12');
+    await fireEvent.press(screen.getByTestId('sign-up-terms'));
     await fireEvent.press(screen.getByRole('button', { name: 'Create account' }));
 
     expect(await screen.findByRole('alert')).toBeTruthy();
@@ -231,6 +233,7 @@ describe('SignUpScreen', () => {
     await fireEvent.changeText(screen.getByLabelText('Full name'), longName);
     await fireEvent.changeText(screen.getByLabelText('Email'), 'ada@b.co');
     await fireEvent.changeText(screen.getByLabelText('Password'), 'secret12');
+    await fireEvent.press(screen.getByTestId('sign-up-terms'));
     await fireEvent.press(screen.getByRole('button', { name: 'Create account' }));
 
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/'));
@@ -250,6 +253,7 @@ describe('SignUpScreen', () => {
     await fireEvent.changeText(screen.getByLabelText('Full name'), 'Ada');
     await fireEvent.changeText(screen.getByLabelText('Email'), 'ada@b.co');
     await fireEvent.changeText(screen.getByLabelText('Password'), 'secret12');
+    await fireEvent.press(screen.getByTestId('sign-up-terms'));
     await fireEvent.press(screen.getByRole('button', { name: 'Create account' }));
 
     expect(await screen.findByRole('alert')).toBeTruthy();

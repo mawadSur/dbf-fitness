@@ -513,7 +513,7 @@ describe('subscription gating', () => {
     (fetchPublishedRecordings as jest.Mock).mockResolvedValue([]);
     mockSub = { ...mockSub, data: subInfo('expired') };
     await renderScreen(<NotesIndexScreen />);
-    expect(await screen.findByText('Your subscription has lapsed')).toBeTruthy();
+    expect(await screen.findByText('Your membership has lapsed')).toBeTruthy();
     expect(screen.queryByText('No workout notes yet')).toBeNull();
     expect(fetchPublishedRecordings).not.toHaveBeenCalled();
   });
@@ -522,8 +522,11 @@ describe('subscription gating', () => {
     (fetchNotesViewer as jest.Mock).mockResolvedValue(MEMBER);
     mockSub = { ...mockSub, data: subInfo('none') };
     await renderScreen(<NotesIndexScreen />);
-    expect(await screen.findByText('Subscribe to unlock workout notes')).toBeTruthy();
-    expect(screen.getByText('Contact your coach to renew.')).toBeTruthy();
+    expect(await screen.findByText('Workout notes are for members')).toBeTruthy();
+    // Store builds carry no purchase call to action — only the neutral membership line and
+    // the support mailto (see src/components/subscription/billing.ts).
+    expect(screen.getByTestId('membership-support')).toBeTruthy();
+    expect(screen.queryByText('Subscribe')).toBeNull();
   });
 
   it('list: grace member sees the banner above their notes', async () => {
@@ -547,7 +550,7 @@ describe('subscription gating', () => {
     (fetchRecordingDetail as jest.Mock).mockResolvedValue(null);
     mockSub = { ...mockSub, data: subInfo('expired') };
     await renderScreen(<RecordingDetailScreen />);
-    expect(await screen.findByText('Your subscription has lapsed')).toBeTruthy();
+    expect(await screen.findByText('Your membership has lapsed')).toBeTruthy();
     expect(screen.queryByText('Recording not available')).toBeNull();
   });
 

@@ -10,8 +10,10 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ConfigGate } from '../src/config/ConfigGate';
 import { RoleProvider } from '../src/features/auth/RoleProvider';
 import { SessionEffects } from '../src/features/auth/SessionEffects';
+import { TermsGate } from '../src/features/legal/TermsGate';
 import { bindAuthCacheReset } from '../src/services/authCacheReset';
 import { queryClient } from '../src/services/queryClient';
 import { bindAuthAutoRefresh } from '../src/services/supabase/autoRefresh';
@@ -170,6 +172,13 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
       </Stack>
+      {/* Apple guideline 1.2: existing accounts and terms-version bumps are re-prompted here.
+          It renders AFTER the navigator so its overlay paints on top of every route, and it
+          returns null unless an acceptance is actually outstanding. `ConfigGate` sits last so a
+          build that cannot reach its backend says so on top of everything, including the gate.
+          Both return null in a healthy build. */}
+      <TermsGate signedIn={signedIn} />
+      <ConfigGate />
     </RoleProvider>
   );
 }

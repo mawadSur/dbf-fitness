@@ -14,9 +14,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "DBF Fitness uses your camera so your coach and group can see you during live classes.",
         "NSMicrophoneUsageDescription": "DBF Fitness uses your microphone so your coach and group can hear you during live classes.",
-        "UIBackgroundModes": [
-          "audio"
-        ]
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -33,6 +31,11 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.POST_NOTIFICATIONS"
+      ],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ],
       "package": "com.dbffitness.app"
     },

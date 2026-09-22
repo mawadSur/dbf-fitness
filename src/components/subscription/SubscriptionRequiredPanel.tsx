@@ -1,7 +1,8 @@
 import { View } from 'react-native';
 
-import { Banner, Button, Card, Text } from '../ui';
-import { billingUrl, CONTACT_COACH_TO_RENEW, openBilling } from './billing';
+import { Banner, Button, Card } from '../ui';
+import { billingUrl, MANAGED_BY_DBF, openBilling } from './billing';
+import { MembershipSupportLink } from './MembershipSupportLink';
 
 type Props = {
   /** `expired`: had a subscription that lapsed past the grace window. `none`: never subscribed. */
@@ -12,15 +13,25 @@ type Props = {
 
 export const REQUIRED_COPY = {
   expired: {
-    title: 'Your subscription has lapsed',
+    title: 'Your membership has lapsed',
     body: 'Renew to read your workout notes again.',
     cta: 'Renew subscription',
   },
   none: {
-    title: 'Subscribe to unlock workout notes',
+    title: 'Workout notes are for members',
     body: 'Workout notes are for subscribed members.',
     cta: 'Subscribe',
   },
+} as const;
+
+/**
+ * Body text used when `billingLinkAllowed()` is false (every store build). It states how
+ * membership works instead of inviting a purchase, so no surface carries a call to action
+ * toward an external payment. See the policy note in `billing.ts`.
+ */
+export const NEUTRAL_BODY = {
+  expired: `Workout notes are for members with an active membership. ${MANAGED_BY_DBF}`,
+  none: `Workout notes are for members with an active membership. ${MANAGED_BY_DBF}`,
 } as const;
 
 /**
@@ -36,13 +47,16 @@ export function SubscriptionRequiredPanel({ state, onRecheck, checking = false }
   return (
     <Card padding={16} testID="subscription-required">
       <View style={{ gap: 12 }}>
-        <Banner tone="warning" title={copy.title} message={copy.body} icon="lock" />
+        <Banner
+          tone="warning"
+          title={copy.title}
+          message={hasBilling ? copy.body : NEUTRAL_BODY[state]}
+          icon="lock"
+        />
         {hasBilling ? (
           <Button label={copy.cta} onPress={() => void openBilling()} fullWidth />
         ) : (
-          <Text role="labelSm" tone="secondary">
-            {CONTACT_COACH_TO_RENEW}
-          </Text>
+          <MembershipSupportLink />
         )}
         {onRecheck ? (
           <Button
